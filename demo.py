@@ -85,6 +85,9 @@ def scan_config_files(file_list):
 
 def scan_elf_files(file_list):
 
+    # Decompile each file and try to extract arguments passed to the network functions
+    # ~~ Jim is experimenting with angr, he will paste something great here (Just you wait) ~~
+
     return
 
 
@@ -108,8 +111,8 @@ def scan_ports(json_path):
             # Check for elf files
             if(item["Analysis"]["file_map"][0]["name"] == "elf"):
                 try:
-                    result = subprocess.run(['strings', item["Analysis"]["file_path"]], capture_output=True, text=True)
-                    # That have network related calls in them
+                    result = subprocess.run(['readelf', '-s', item["Analysis"]["file_path"]], capture_output=True, text=True)
+                    # That have network related calls imported in them
                     if any(word in result.stdout for word in ['bind', 'listen', 'accept', 'socket']):
                         elf_files.append(item["Analysis"]["file_path"])
                 except Exception as e:
