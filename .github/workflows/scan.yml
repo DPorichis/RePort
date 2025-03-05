@@ -34,11 +34,12 @@ jobs:
           cargo build --release
           sudo ln -s $PWD/target/release/binwalk /usr/local/bin/binwalk
 
-      - name: Ensure dd and 7zip are installed
+      - name: Ensure dd, strings and 7zip are installed
         run: |
           sudo apt-get update
           sudo apt-get install -y coreutils
           sudo apt-get install 7zip-standalone
+          sudo apt-get install binutils
 
       - name: Download firmware from Google Drive
         run: |
