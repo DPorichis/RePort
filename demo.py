@@ -10,7 +10,7 @@ def extract_firmware(file_path):
     
     # Run Binwalk on the given firmware
     try:
-        result = subprocess.run(["binwalk", "-eM", "-v", "-l", f"./{folder_name}/structure.json", "-d", f"./{folder_name}/extractions", file_path], check=True)
+        result = subprocess.run(["binwalk", "-eM", "-l", f"./{folder_name}/structure.json", "-d", f"./{folder_name}/extractions", file_path], check=True)
     except FileNotFoundError:
         print("Error: binwalk is not installed.")
         return
@@ -21,7 +21,7 @@ def extract_firmware(file_path):
     # Read the json file containing its parts
     with open(f"./{folder_name}/structure.json", "r") as file:
         data = json.load(file)
-    print(data)
+    # print(data)
 
 
     # Extract files that weren't extracted
@@ -69,6 +69,7 @@ def scan_config_files(file_list):
             print(f"Error while reading {file}: {e}")
     
     # Possible_ports now has all instances of 2-5 digit numbers with their context and file
+    print(f"Possible ports: {possible_ports}")
     # TODO: Possible use of LLMs to access likelyhood of the given number being an actual port
 
     # Implementation for now:
@@ -129,11 +130,11 @@ def scan_ports(json_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run binwalk on a given binary file.")
+    parser = argparse.ArgumentParser(description="Port analysis on a given binary file.")
     parser.add_argument("file", help="Path to the binary file")
     args = parser.parse_args()
     
-    # extract_firmware(args.file)
+    extract_firmware(args.file)
     export_json = f"./temp_{os.path.basename(args.file)}/structure.json"
     # print(export_json)
 
