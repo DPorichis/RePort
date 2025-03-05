@@ -2,6 +2,7 @@ import subprocess
 import argparse
 import json
 import os
+import re
 
 def extract_firmware(file_path):
     folder_name = f"temp_{os.path.basename(file_path)}"  # Get just the filename
@@ -47,15 +48,54 @@ def extract_firmware(file_path):
                 #         result = subprocess.run(["objdump", "-D", f"{extract_path}/{hex_string}/{name}"], stdout=d, check=True)
 
 
+def scan_config_files(file_list):
+    
+    # Regex for storing number with 2-5 digits
+    port_regex = re.compile(r'(?<!\d)(\d{2,5})(?!\d)')
+    
+    # List for storing our artifacts
+    possible_ports = []
+    
+    for file in file_list:
+        try:
+            with open(file, 'r', errors='ignore') as f:
+                for line in f:
+                    # Find numbers that can be ports
+                    artifacts = port_regex.findall(line)
+                    # And store them with their context for analysis
+                    for item in artifacts:
+                        possible_ports.append({"port": item, "context": line, "file": os.path.basename(file)})
+        except Exception as e:
+            print(f"Error while reading {file}: {e}")
+    
+    # Possible_ports now has all instances of 2-5 digit numbers with their context and file
+    # TODO: Possible use of LLMs to access likelyhood of the given number being an actual port
+
+    # Implementation for now:
+
+    # Check if context has any reference to the word PORT
+    ports = set()
+
+    for item in possible_ports:
+        if "port" in item["context"].lower():    
+            ports.add(item["port"])
+
+    return ports
+
+def scan_elf_files(file_list):
+
+    return
+
+
+
 def scan_ports(json_path):
 
     with open(json_path, "r") as file:
         data = json.load(file)
-    print(data)
+    # print(data)
 
     elf_files = []
     config_files = []
-
     for item in data:
         # If it is a final text file
         if len(item["Analysis"]["file_map"]) == 0:
@@ -64,26 +104,25 @@ def scan_ports(json_path):
                 config_files.append(item["Analysis"]["file_path"])
         # For files with relevant desc
         elif len(item["Analysis"]["file_map"]) == 1:
-            # Keep all elf files for analysis
+            # Check for elf files
             if(item["Analysis"]["file_map"][0]["name"] == "elf"):
-                elf_files.append(item["Analysis"]["file_path"])
+                try:
+                    result = subprocess.run(['strings', item["Analysis"]["file_path"]], capture_output=True, text=True)
+                    # That have network related calls in them
+                    if any(word in result.stdout for word in ['bind', 'listen', 'accept', 'socket']):
+                        elf_files.append(item["Analysis"]["file_path"])
+                except Exception as e:
+                    print(f"Re auto xalase {file}: {e}")
+    
+    print("--- Key Files Found ---")
+    print(f"Network related ELF files: {len(elf_files)}")
+    print(f"Configuration files: {len(config_files)}")
+    print("-----------------------")
 
-    print(len(elf_files))
-    print(len(config_files))
+    config_ports = scan_config_files(config_files)
+    print(f"Ports found in the config files: {config_ports}")
 
-
-    # Perform scan of relevant function calls on all elf_files
-    target_elfs = []
-    for file in elf_files:
-        try:
-            result = subprocess.run(['strings', file], capture_output=True, text=True)
-            if any(word in result.stdout for word in ['bind', 'listen', 'accept', 'socket']):
-                target_elfs.append(file)
-        except Exception as e:
-            print(f"Re auto xalase {file}: {e}")
-
-    # Number of network related ELFs
-    print(len(target_elfs))
+    scan_elf_files(elf_files)
 
     return
 
@@ -94,9 +133,9 @@ if __name__ == "__main__":
     parser.add_argument("file", help="Path to the binary file")
     args = parser.parse_args()
     
-    extract_firmware(args.file)
+    # extract_firmware(args.file)
     export_json = f"./temp_{os.path.basename(args.file)}/structure.json"
-    print(export_json)
+    # print(export_json)
 
     scan_ports(export_json)
 
