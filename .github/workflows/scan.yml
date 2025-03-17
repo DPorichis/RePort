@@ -42,6 +42,12 @@ jobs:
           sudo apt-get install binutils
           sudo apt-get install binutils-arm-linux-gnueabi
 
+      - name: Install angr
+        run: |
+          # Install angr and dependencies using pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install angr
+      
       - name: Download firmware from Google Drive
         run: |
           wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1N7G8-tUa3lRRTqmrepPpcY02p3fM0aTj' -O firmware.bin
