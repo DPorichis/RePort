@@ -1,1 +1,3 @@
 inputs/
+venv/
+**/__pycache__/
