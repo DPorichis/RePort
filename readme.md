@@ -5,10 +5,10 @@ More info coming soon...
 ## Implementation Graph
 `This will get more detailed, trust me`
 
-
 ```mermaid
 graph LR
-    I((Firmware)) --> A[File Extraction] --> B[Service Discovery] --> C[TBD] --> D[Visualization]
+    IP((IP)):::equalCircleStyle --> Port[Port Discovery] --> Fing[Service Finger-printing] --> D[Visualization]
+    Bin((Firmware)):::equalCircleStyle --> Em[Emulation & Systemcall tracking] --> Pars[Log parser] --> Ident[Service Identificator] --> D[Visualization]
 ```
 
 ## Bibliography
