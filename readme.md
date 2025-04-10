@@ -9,6 +9,7 @@ More info coming soon...
 graph LR
     IP((IP)):::equalCircleStyle --> Port[Port Discovery] --> Fing[Service Finger-printing] --> D[Visualization]
     Bin((Firmware)):::equalCircleStyle --> Em[Emulation & Systemcall tracking] --> Pars[Log parser] --> Ident[Service Identificator] --> D[Visualization]
+    Em[Emulation & Systemcall tracking] --> Port[Port Discovery]
 ```
 
 ## Bibliography

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 import subprocess
+import xml.etree.ElementTree as ET
+from blackbox.scan import *
 
 class MappingEngine(ABC):
     """
@@ -8,6 +10,10 @@ class MappingEngine(ABC):
     
     # Key = user option, value = actual flag for the engine
     flag_mapping = {}
+
+    def __init__(self, reportStruct=None, ip=''):
+        if(reportStruct == None):
+            self.reportStruct = BlackBoxScan(ip)
 
     @abstractmethod
     def name(self):
@@ -28,12 +34,12 @@ class MappingEngine(ABC):
     @abstractmethod
     def parser(self, scan_result):
         """
-        Parser for the execution of a scan, converting the run results to a BlackBoxScan instance.
+        Parser for the execution of a scan, converting the run results to a BlackBoxScan instance inside the class.
         """
         pass
 
     @abstractmethod
-    def scan(self, IP, options):
+    def scan(self, ip, options):
         """
         Run a scan on the given target IP.
         """
@@ -47,10 +53,28 @@ class NmapEngine(MappingEngine):
         return "nmap"
 
     def parser(self, scan_result):
-        return "mmmmm parser!!!"
 
-    def scan(self, IP, options=''):
-        command = ['nmap'] + options.split() + [IP]
+        # Find all <port> elements
+        root = ET.fromstring(scan_result)
+        for port_tag in root.findall('.//port'):
+            protocol = port_tag.get('protocol')
+            port = port_tag.get('portid')
+
+            state_tag = port_tag.find('state')
+            service_tag = port_tag.find('service')
+
+            state = state_tag.get('state') 
+            service = service_tag.get('name')
+            print(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service}")
+            self.reportStruct.add_port(int(port), protocol, service, state, self.name())
+        
+
+        return self.reportStruct
+
+    def scan(self, ip=None, options='-oX -'):
+        if ip == None:
+            ip = self.reportStruct.ip_address
+        command = ['nmap'] + options.split() + [ip]
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             return self.parser(result.stdout)
