@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from blackbox.scan import *
 
@@ -45,9 +46,22 @@ class MappingEngine(ABC):
         """
         pass
 
+def list_all_engines():
+    return MappingEngine.__subclasses__()
+
+def get_engine_by_name(name):
+    for engine_cls in MappingEngine.__subclasses__():
+        engine = engine_cls()
+        if engine.name().lower() == name.lower():
+            return engine
+    return None
+
+
+# Nmap
+
 class NmapEngine(MappingEngine):
 
-    flag_mapping = {"advanced": "-kati_cool"}
+    flag_mapping = {"advanced": "-sV", "default": " "}
 
     def name(self):
         return "nmap"
@@ -65,16 +79,24 @@ class NmapEngine(MappingEngine):
 
             state = state_tag.get('state') 
             service = service_tag.get('name')
-            print(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service}")
-            self.reportStruct.add_port(int(port), protocol, service, state, self.name())
+            conf = service_tag.get('conf')
+            print(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service} [confidence {conf}]")
+            self.reportStruct.add_port(port=int(port), protocol=protocol, service=service, state=state, conf=int(conf), engine=self.name())
         
 
         return self.reportStruct
 
-    def scan(self, ip=None, options='-oX -'):
+    def scan(self, ip=None, options='default'):
+        export_to_xml = '-oX -'
+        command = ['nmap'] + export_to_xml.split()
+        mapped_option = self.flag_mapping.get(options)
+        if mapped_option:
+            command += mapped_option.split()
+        else:
+            print(f"[!] Unknown option: {options}. Using default scan.", file=sys.stderr)
         if ip == None:
             ip = self.reportStruct.ip_address
-        command = ['nmap'] + options.split() + [ip]
+        command += [ip]
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=True)
             return self.parser(result.stdout)

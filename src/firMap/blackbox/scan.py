@@ -4,12 +4,13 @@ class BlackBoxScan:
         self.ip_address = ip_address
         self.ports = {} # key = port_number, value = list of dicts with details
 
-    def add_port(self, port, protocol="Unknown", service="Unknown", state="Unknown", engine="Not Specified"):
+    def add_port(self, port, protocol="Unknown", service="Unknown", state="Unknown", conf=0, engine="Not Specified"):
         if self.ports.get(port) is not None:
             self.ports[port].append({
                 "protocol": protocol,
                 "service": service,
                 "state": state,
+                "confidence": conf,
                 "source": engine 
                 })
         else:
@@ -17,5 +18,6 @@ class BlackBoxScan:
                 "protocol": protocol,
                 "service": service,
                 "state": state,
+                "confidence": conf,
                 "source": engine 
             }]
