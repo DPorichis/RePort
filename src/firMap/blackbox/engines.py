@@ -10,7 +10,7 @@ class MappingEngine(ABC):
     """
     
     # Key = user option, value = actual flag for the engine
-    flag_mapping = {}
+    flag_mapping = {"default": " "}
 
     def __init__(self, reportStruct=None, ip=''):
         if(reportStruct == None):
@@ -29,7 +29,7 @@ class MappingEngine(ABC):
         """
         output = f"Engine Name: {self.name()} \nSupported Options:\n"
         for option, flag in self.flag_mapping.items():
-            output += f"   {option}: {flag}\n"
+            output += f"   {option}: \'{flag}\'\n"
         return output
 
     @abstractmethod
@@ -47,7 +47,10 @@ class MappingEngine(ABC):
         pass
 
 def list_all_engines():
-    return MappingEngine.__subclasses__()
+    print("Available engines:")
+    for engine_cls in MappingEngine.__subclasses__():
+        engine = engine_cls()
+        print(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
 
 def get_engine_by_name(name):
     for engine_cls in MappingEngine.__subclasses__():

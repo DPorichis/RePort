@@ -9,6 +9,14 @@ def blackbox(args):
         list_all_engines()
         return
     
+    if args.engine_help:
+        help_engine = get_engine_by_name(args.engine_help)
+        if help_engine is None:
+            print(f"[!] Blackbox Monitor (-engine-help): No engine named '{args.engine}' was found - See available engines by using the -le flag", file=sys.stderr)
+            return
+        else:
+            print(help_engine.help())
+    
     engine = NmapEngine()
     if args.engine is not None:
         engine = get_engine_by_name(args.engine)
@@ -24,8 +32,11 @@ def blackbox(args):
     else:
         ip = args.ip
 
-    # print(engine.help())
-    output = engine.scan(ip=ip)
+    opt = 'default'
+    if args.engine_mode:
+        opt = args.engine_mode
+
+    output = engine.scan(ip=ip, options=opt)
     print(output)
 
 
