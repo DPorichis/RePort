@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
-from firMap.graybox.scan import *
+from scan import *
 import subprocess
+import psycopg2
 import sys
 import os
 import re
@@ -15,7 +16,7 @@ class EmulationEngines(ABC):
 
     def __init__(self, reportStruct=None, firmware='', ip=''):
         if(reportStruct == None):
-            self.reportStruct = GrayBoxScan(ip, firmware)
+            self.reportStruct = GrayBoxScan(firmware=firmware, ip_address='')
             self.emulationProc = None
 
     @abstractmethod
@@ -83,10 +84,6 @@ class EmulationEngines(ABC):
         binary = CriticalBinary(path, cert)
         
 
-
-
-
-
 def list_all_engines():
     print("Available engines:")
     for engine_cls in EmulationEngines.__subclasses__():
@@ -106,11 +103,31 @@ def get_engine_by_name(name):
 class FirmAE(EmulationEngines):
 
     PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
-
     flag_mapping = {"advanced": "-sV", "default": " "}
+
+    DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "default_db")
+    DATABASE_USR = os.getenv("FIRMAE_DB_USER", "default_user")
+    DATABASE_PSW = os.getenv("FIRMAE_DB_PSW", "")
+    
+    DATABASE_HOST = os.getenv("FIRMAE_DB_HOST", "localhost")
+    DATABASE_PORT = os.getenv("FIRMAE_DB_PORT", "5432")
 
     def name(self):
         return "FirmAE"
+    
+    def connect_to_db(self):
+        try:
+            conn = psycopg2.connect(
+                dbname=self.DATABASE_NAME,
+                user=self.DATABASE_USR,
+                password=self.DATABASE_PSW,
+                host=self.DATABASE_HOST,
+                port=self.DATABASE_PORT
+            )
+            return conn
+        except Exception as e:
+            print(f"[!] Graybox Monitor (FirmAE): Database connection failed: {e}")
+            return None
 
     def analysis(self, input_file):
         bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
@@ -145,10 +162,32 @@ class FirmAE(EmulationEngines):
         return
         
     def check(self):
-        command = [f"{self.PATH_TO_FIRMAE}run.sh", "-c", self.reportStruct.brand, self.reportStruct.firware_path]
+        print(os.path.abspath(self.reportStruct.firware_path))
+        command = ["sudo", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
         try:
-            result = subprocess.run(command, capture_output=True, text=True, check=True)
-            return
+            print("[i] Graybox Monitor (FirmAE): Elavated permissions are required, enter sudo password if prompted", file=sys.stderr)
+            result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)
         except subprocess.CalledProcessError as e:
             return f"Error: {e.stderr}"
+        
+        db = self.connect_to_db()
+        if db:
+            with db.cursor() as cur:
+                cur.execute("SELECT * FROM some_table LIMIT 5;")
+                rows = cur.fetchall()
+                for row in rows:
+                    print(row)
+            db.close()
 
+        
+    def emulate(self, ip, options):
+        return
+
+    def terminate(self):
+        return
+
+if __name__ == "__main__":
+    firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
+    engine = FirmAE(firmware=firmware_path)
+    print(engine.reportStruct.firware_path)
+    engine.check()
