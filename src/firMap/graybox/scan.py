@@ -1,7 +1,6 @@
 import os
 import sys
 import hashlib
-from blackbox.engines import *
 
 class GrayBoxScan:
     def __init__(self, firmware='', fs='', ip_address=None, brand='unknown'):
@@ -10,11 +9,27 @@ class GrayBoxScan:
         self.firware_path = firmware
         self.filesystem_path = fs
         self.brand = brand
+        self.md5_hash = self.io_md5(self.firware_path)
 
-        self.logs = []
+        self.logs = ""
         self.bind_calls = []
         self.critical_processes = set()
         self.ports = {}
+
+    def io_md5(self, target):
+        """
+        Performs MD5 with a block size of 64kb.
+        """
+        blocksize = 65536
+        hasher = hashlib.md5()
+
+        with open(target, 'rb') as ifp:
+            buf = ifp.read(blocksize)
+            while buf:
+                hasher.update(buf)
+                buf = ifp.read(blocksize)
+            return hasher.hexdigest()
+
 
 class CriticalBinary:
     def compute_sha256(self):
@@ -44,3 +59,10 @@ class CriticalBinary:
         self.sha = self.compute_sha256()
         self.version = [{"version":'unknown', "source":'initial', "cert":'0'}]
         return
+    
+    def print(self):
+        print(f"--- {self.name}'s Label ---")
+        print(f"- Path: {self.path}")
+        print(f"- Cert: {self.cert}")
+        print(f"- SHA256: {self.sha}")
+        print(f"- Possible versions: {self.version}")

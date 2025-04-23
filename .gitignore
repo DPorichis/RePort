@@ -1,3 +1,5 @@
 inputs/
 venv/
 **/__pycache__/
+FirmaINC/
+env/

@@ -3,6 +3,8 @@ import xml.etree.ElementTree as ET
 from scan import *
 import subprocess
 import psycopg2
+import tarfile
+import shutil
 import sys
 import os
 import re
@@ -64,12 +66,12 @@ class EmulationEngines(ABC):
         """
         pass
 
-    def find_binaries_by_name(self, process_name):
+    def find_binaries_by_name(self, process_name, path_to_fs):
         """
         Looks up the process name and associates it with possible binaries.
         """
         matches = []
-        for dirpath, _, filenames in os.walk(self.reportStruct.filesystem_path):
+        for dirpath, _, filenames in os.walk(path_to_fs):
             for filename in filenames:
                 if filename == process_name:
                     full_path = os.path.join(dirpath, filename)
@@ -82,7 +84,7 @@ class EmulationEngines(ABC):
         Performs binary analysis on a given target, and returns a CriticalBinary instance with its"
         """
         binary = CriticalBinary(path, cert)
-        return
+        return binary
 
     def verification(self):
         """
@@ -117,12 +119,13 @@ def get_engine_by_name(name):
 
 class FirmAE(EmulationEngines):
 
-    PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
+    # PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
+    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
     flag_mapping = {"advanced": "-sV", "default": " "}
 
-    DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "default_db")
-    DATABASE_USR = os.getenv("FIRMAE_DB_USER", "default_user")
-    DATABASE_PSW = os.getenv("FIRMAE_DB_PSW", "")
+    DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
+    DATABASE_USR = os.getenv("FIRMAE_DB_USER", "firmadyne")
+    DATABASE_PSW = os.getenv("FIRMAE_DB_PSW", "firmadyne")
     
     DATABASE_HOST = os.getenv("FIRMAE_DB_HOST", "localhost")
     DATABASE_PORT = os.getenv("FIRMAE_DB_PORT", "5432")
@@ -144,9 +147,11 @@ class FirmAE(EmulationEngines):
             print(f"[!] Graybox Monitor (FirmAE): Database connection failed: {e}")
             return None
 
-    def analysis(self, input_file):
+    def analysis(self):
         bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
         # close_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
+
+        input_file = self.reportStruct.logs + 'qemu.final.serial.log'
 
         with open(input_file, 'r') as file:
             for line in file:
@@ -161,7 +166,7 @@ class FirmAE(EmulationEngines):
                     })
                     self.reportStruct.critical_processes.add(match.group(2))
                     port = int(match.group(4))
-                    if self.reportStruct.ports[port]:
+                    if port in self.reportStruct.ports.keys():
                         self.reportStruct.ports[port]['owners'].append(match.group(2))
                     else:
                         self.reportStruct.ports[port] = {'owners':[match.group(2)], 'verification': None}
@@ -171,19 +176,34 @@ class FirmAE(EmulationEngines):
 
         for entry in self.reportStruct.bind_calls:
             print(entry)
+        
+        # Decompress the file system for analysis
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        cache_dir = os.path.join(script_dir, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
+            tar.extractall(path=cache_dir)
+
+        print(f"Extracted zip to {cache_dir}")
 
         # Perform process profiling for all critical processes
         for proc in self.reportStruct.critical_processes:
-            possible_targets = self.find_binaries_by_name(proc)
-            cert = 10/len(possible_targets)
-            for target in possible_targets:
-                binary_label = self.binary_profiling(target, [])
+            possible_targets = self.find_binaries_by_name(proc, cache_dir)
+            if(len(possible_targets) != 0):
+                cert = 10/len(possible_targets)
+                for target in possible_targets:
+                    binary_label = self.binary_profiling(target, [])
+                    binary_label.print()
+
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
 
         return
         
     def check(self):
         print(os.path.abspath(self.reportStruct.firware_path))
-        command = ["sudo", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
+        command = ["sudo", "-E", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
         try:
             print("[i] Graybox Monitor (FirmAE): Elavated permissions are required, enter sudo password if prompted", file=sys.stderr)
             result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)
@@ -193,12 +213,18 @@ class FirmAE(EmulationEngines):
         db = self.connect_to_db()
         if db:
             with db.cursor() as cur:
-                cur.execute("SELECT * FROM some_table LIMIT 5;")
-                rows = cur.fetchall()
-                for row in rows:
-                    print(row)
+                cur.execute("SELECT id FROM image WHERE hash=%s;", (str(self.reportStruct.md5_hash),))
+                result = cur.fetchone()
+                if result is not None:
+                    image_id = result[0]
+                    self.reportStruct.filesystem_path = self.PATH_TO_FIRMAE + "images/" + str(image_id) + ".tar.gz"
+                    self.reportStruct.logs = self.PATH_TO_FIRMAE + "scratch/" + str(image_id) + "/"
+                else:
+                    print("[!] Graybox Monitor (FirmAE): FirmAE failed miserably.", file=sys.stderr)
             db.close()
 
+        self.analysis()
+        return
         
     def emulate(self, ip, options):
         return
@@ -207,7 +233,8 @@ class FirmAE(EmulationEngines):
         return
 
 if __name__ == "__main__":
-    firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
+    # firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
+    firmware_path = "/home/porichis/dit-thesis/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
     engine = FirmAE(firmware=firmware_path)
     print(engine.reportStruct.firware_path)
     engine.check()
