@@ -1,11 +1,11 @@
 import os
 import sys
 import hashlib
+from blackbox.engines import *
 
 class GrayBoxScan:
     def __init__(self, firmware='', fs='', ip_address=None, brand='unknown'):
         self.black_verification = None
-        
         self.ip_address = ip_address
         self.firware_path = firmware
         self.filesystem_path = fs
@@ -13,8 +13,8 @@ class GrayBoxScan:
 
         self.logs = []
         self.bind_calls = []
-
         self.critical_processes = set()
+        self.ports = {}
 
 class CriticalBinary:
     def compute_sha256(self):

@@ -86,7 +86,6 @@ class NmapEngine(MappingEngine):
             print(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service} [confidence {conf}]")
             self.reportStruct.add_port(port=int(port), protocol=protocol, service=service, state=state, conf=int(conf), engine=self.name())
         
-
         return self.reportStruct
 
     def scan(self, ip=None, options='default'):

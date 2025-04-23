@@ -82,7 +82,22 @@ class EmulationEngines(ABC):
         Performs binary analysis on a given target, and returns a CriticalBinary instance with its"
         """
         binary = CriticalBinary(path, cert)
-        
+        return
+
+    def verification(self):
+        """
+        Performs blackbox verification on the emulated target
+        """
+        blackbox = NmapEngine(ip=self.reportStruct.ip_address)        
+        blackbox.scan()
+
+        for port in blackbox.reportStruct.ports.keys():
+            if port in self.reportStruct.ports.keys():
+                self.reportStruct.ports[port]['verification'] = blackbox.reportStruct.ports[port]
+            else:
+                self.reportStruct.ports[port] = {"owner":"Unkwown", 'verification': blackbox.reportStruct.ports[port]}
+
+        return
 
 def list_all_engines():
     print("Available engines:")
@@ -145,7 +160,12 @@ class FirmAE(EmulationEngines):
                         'port': int(match.group(4))
                     })
                     self.reportStruct.critical_processes.add(match.group(2))
-                
+                    port = int(match.group(4))
+                    if self.reportStruct.ports[port]:
+                        self.reportStruct.ports[port]['owners'].append(match.group(2))
+                    else:
+                        self.reportStruct.ports[port] = {'owners':[match.group(2)], 'verification': None}
+
                 # Search for close syscalls on file descriptors that we care about
                 # (Not supported by FirmAE)
 
