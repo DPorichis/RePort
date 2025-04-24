@@ -1,7 +1,9 @@
 import os
 import sys
 import hashlib
+from firMap.utils import Logger
 
+log = Logger("Graybox Monitor")
 class GrayBoxScan:
     def __init__(self, firmware='', fs='', ip_address=None, brand='unknown'):
         self.black_verification = None
@@ -40,10 +42,10 @@ class CriticalBinary:
                     sha256.update(chunk)
                 return sha256.hexdigest()
         except FileNotFoundError:
-            print(f'[!] Graybox Monitor (binary profiler): File \"{self.path}\" was not found, SHA will not be calculated', file=sys.stderr)
+            log.log_message("error", f"File \"{self.path}\" was not found, SHA will not be calculated", "binary profiler")
             return 'BNF'
         except Exception as e:
-            print(f'[!] Graybox Monitor (binary profiler): An exception occured, SHA will not be calculated (Exception: {e})', file=sys.stderr)
+            print(f'[-] Graybox Monitor (binary profiler): An exception occured, SHA will not be calculated (Exception: {e})', file=sys.stderr)
             return 'EXP'
 
     def retrieve_version(self):
@@ -52,12 +54,15 @@ class CriticalBinary:
         # TODO: Perform Strings search inside the binary to extract version
         return
 
-    def __init__(self, path='', cert=10):
+    def __init__(self, path='', name='', cert=10, ports=[]):
         self.path = path
-        self.name = os.path.basename(path)
+        self.name = name
+        if(name == ''):
+            self.name = os.path.basename(path)
         self.cert = cert
         self.sha = self.compute_sha256()
         self.version = [{"version":'unknown', "source":'initial', "cert":'0'}]
+        self.ports = ports
         return
     
     def print(self):
@@ -66,3 +71,4 @@ class CriticalBinary:
         print(f"- Cert: {self.cert}")
         print(f"- SHA256: {self.sha}")
         print(f"- Possible versions: {self.version}")
+        print(f"- Ports opened: {self.ports}")

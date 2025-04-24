@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
-from scan import *
+from firMap.graybox.scan import *
+from ..utils import Logger
 import subprocess
 import psycopg2
 import tarfile
@@ -8,6 +9,8 @@ import shutil
 import sys
 import os
 import re
+
+log = Logger("Graybox Monitor")
 
 class EmulationEngines(ABC):
     """
@@ -79,11 +82,11 @@ class EmulationEngines(ABC):
                         matches.append(full_path)
         return matches
 
-    def binary_profiling(self, path, ports=[], cert=10):
+    def binary_profiling(self, path, name='', ports=[], cert=10):
         """
         Performs binary analysis on a given target, and returns a CriticalBinary instance with its"
         """
-        binary = CriticalBinary(path, cert)
+        binary = CriticalBinary(path, name, cert, ports)
         return binary
 
     def verification(self):
@@ -144,7 +147,7 @@ class FirmAE(EmulationEngines):
             )
             return conn
         except Exception as e:
-            print(f"[!] Graybox Monitor (FirmAE): Database connection failed: {e}")
+            log.log_message("error", f"Database connection failed: {e}", "FirmAE")
             return None
 
     def analysis(self):
@@ -153,6 +156,7 @@ class FirmAE(EmulationEngines):
 
         input_file = self.reportStruct.logs + 'qemu.final.serial.log'
 
+        reverse_port_mapping = {}
         with open(input_file, 'r') as file:
             for line in file:
                 # Search for bind systemcalls
@@ -170,6 +174,12 @@ class FirmAE(EmulationEngines):
                         self.reportStruct.ports[port]['owners'].append(match.group(2))
                     else:
                         self.reportStruct.ports[port] = {'owners':[match.group(2)], 'verification': None}
+                    proc = match.group(2)
+                    if proc in reverse_port_mapping.keys():
+                        reverse_port_mapping[proc].add(port)
+                    else:
+                        reverse_port_mapping[proc] = set()
+                        reverse_port_mapping[proc].add(port)
 
                 # Search for close syscalls on file descriptors that we care about
                 # (Not supported by FirmAE)
@@ -190,11 +200,12 @@ class FirmAE(EmulationEngines):
         # Perform process profiling for all critical processes
         for proc in self.reportStruct.critical_processes:
             possible_targets = self.find_binaries_by_name(proc, cache_dir)
-            if(len(possible_targets) != 0):
-                cert = 10/len(possible_targets)
-                for target in possible_targets:
-                    binary_label = self.binary_profiling(target, [])
-                    binary_label.print()
+            if(len(possible_targets) == 0):
+                possible_targets = ['']
+            cert = 10/len(possible_targets)
+            for target in possible_targets:
+                binary_label = self.binary_profiling(target, proc, list(reverse_port_mapping[proc]))
+                binary_label.print()
 
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
@@ -205,7 +216,7 @@ class FirmAE(EmulationEngines):
         print(os.path.abspath(self.reportStruct.firware_path))
         command = ["sudo", "-E", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
         try:
-            print("[i] Graybox Monitor (FirmAE): Elavated permissions are required, enter sudo password if prompted", file=sys.stderr)
+            log.log_message("info", "Elavated permissions are required, enter sudo password if prompted", "FirmAE")
             result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)
         except subprocess.CalledProcessError as e:
             return f"Error: {e.stderr}"
@@ -220,7 +231,7 @@ class FirmAE(EmulationEngines):
                     self.reportStruct.filesystem_path = self.PATH_TO_FIRMAE + "images/" + str(image_id) + ".tar.gz"
                     self.reportStruct.logs = self.PATH_TO_FIRMAE + "scratch/" + str(image_id) + "/"
                 else:
-                    print("[!] Graybox Monitor (FirmAE): FirmAE failed miserably.", file=sys.stderr)
+                    log.log_message("error", "FirmAE failed miserably.", "FirmAE")
             db.close()
 
         self.analysis()
