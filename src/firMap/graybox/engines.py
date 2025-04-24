@@ -110,9 +110,9 @@ def list_all_engines():
         engine = engine_cls()
         print(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
 
-def get_engine_by_name(name):
+def get_engine_by_name(name, firmware=''):
     for engine_cls in EmulationEngines.__subclasses__():
-        engine = engine_cls()
+        engine = engine_cls(firmware=firmware)
         if engine.name().lower() == name.lower():
             return engine
     return None

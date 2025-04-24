@@ -1,5 +1,5 @@
-from blackbox.engines import *
-from blackbox.scan import *
+from firMap.blackbox.engines import *
+from firMap.blackbox.scan import *
 import sys
 import subprocess
 

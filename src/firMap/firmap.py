@@ -1,5 +1,6 @@
 import argparse
-from blackbox.blackbox import blackbox
+from firMap.blackbox.blackbox import blackbox
+from firMap.graybox.graybox import graybox
 
 def main():
     parser = argparse.ArgumentParser(description="FirMap ~ Automatically Mapping the Attack Surface of System")
@@ -22,7 +23,8 @@ def main():
     if args.black or not args.gray:
         blackbox(args)
     else:
-        print("Graybox analysis comming soon!")
+        graybox(args)
         return
+
 if __name__ == "__main__":
     main()

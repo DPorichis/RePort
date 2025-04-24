@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
-from blackbox.scan import *
+from firMap.blackbox.scan import *
 
 class MappingEngine(ABC):
     """

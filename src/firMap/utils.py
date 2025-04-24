@@ -8,7 +8,7 @@ class Logger:
 
     def log_message(self, type='info', message="This is a message", module=""):
         output = self.monitor
-        if module == "":
+        if module != "":
             output += " (" + module + ")"
         output += ": " + message
         if (type=="info"):
