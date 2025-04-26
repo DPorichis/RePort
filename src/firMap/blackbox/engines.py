@@ -3,6 +3,9 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from firMap.blackbox.scan import *
+from firMap.utils import Logger
+
+log = Logger("Blackbox Monitor")
 
 class MappingEngine(ABC):
     """
@@ -47,10 +50,10 @@ class MappingEngine(ABC):
         pass
 
 def list_all_engines():
-    print("Available engines:")
+    log.output("Available engines:")
     for engine_cls in MappingEngine.__subclasses__():
         engine = engine_cls()
-        print(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
+        log.output(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
 
 def get_engine_by_name(name):
     for engine_cls in MappingEngine.__subclasses__():
@@ -83,7 +86,7 @@ class NmapEngine(MappingEngine):
             state = state_tag.get('state') 
             service = service_tag.get('name')
             conf = service_tag.get('conf')
-            print(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service} [confidence {conf}]")
+            log.output(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service} [confidence {conf}]")
             self.reportStruct.add_port(port=int(port), protocol=protocol, service=service, state=state, conf=int(conf), engine=self.name())
         
         return self.reportStruct
@@ -95,7 +98,7 @@ class NmapEngine(MappingEngine):
         if mapped_option:
             command += mapped_option.split()
         else:
-            print(f"[!] Unknown option: {options}. Using default scan.", file=sys.stderr)
+            log.message("warn", f"Unknown option: {options}. Using default scan.", file=sys.stderr)
         if ip == None:
             ip = self.reportStruct.ip_address
         command += [ip]

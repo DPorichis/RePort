@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
 from firMap.graybox.scan import *
 from ..utils import Logger
+from firMap.blackbox.engines import NmapEngine
 import subprocess
 import psycopg2
 import tarfile
@@ -95,7 +96,6 @@ class EmulationEngines(ABC):
         """
         blackbox = NmapEngine(ip=self.reportStruct.ip_address)        
         blackbox.scan()
-
         for port in blackbox.reportStruct.ports.keys():
             if port in self.reportStruct.ports.keys():
                 self.reportStruct.ports[port]['verification'] = blackbox.reportStruct.ports[port]
@@ -105,10 +105,10 @@ class EmulationEngines(ABC):
         return
 
 def list_all_engines():
-    print("Available engines:")
+    log.output("Available engines:")
     for engine_cls in EmulationEngines.__subclasses__():
         engine = engine_cls()
-        print(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
+        log.output(f" - {engine.name()} [modes available: {', '.join(engine.flag_mapping.keys())}]")
 
 def get_engine_by_name(name, firmware=''):
     for engine_cls in EmulationEngines.__subclasses__():
@@ -122,8 +122,8 @@ def get_engine_by_name(name, firmware=''):
 
 class FirmAE(EmulationEngines):
 
-    # PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
-    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
+    PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
+    # PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
     flag_mapping = {"advanced": "-sV", "default": " "}
 
     DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
@@ -147,14 +147,14 @@ class FirmAE(EmulationEngines):
             )
             return conn
         except Exception as e:
-            log.log_message("error", f"Database connection failed: {e}", "FirmAE")
+            log.message("error", f"Database connection failed: {e}", "FirmAE")
             return None
 
     def analysis(self):
         bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
         # close_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
 
-        input_file = self.reportStruct.logs + 'qemu.final.serial.log'
+        input_file = self.reportStruct.logs + 'qemu.initial.serial.log'
 
         reverse_port_mapping = {}
         with open(input_file, 'r') as file:
@@ -162,6 +162,7 @@ class FirmAE(EmulationEngines):
                 # Search for bind systemcalls
                 match = re.search(bind_pattern, line)
                 if match:
+                    print(match)
                     self.reportStruct.bind_calls.append({
                         'timestamp': match.group(1),
                         'process_name': match.group(2),
@@ -185,7 +186,7 @@ class FirmAE(EmulationEngines):
                 # (Not supported by FirmAE)
 
         for entry in self.reportStruct.bind_calls:
-            print(entry)
+            log.output(entry)
         
         # Decompress the file system for analysis
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -194,8 +195,6 @@ class FirmAE(EmulationEngines):
 
         with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
             tar.extractall(path=cache_dir)
-
-        print(f"Extracted zip to {cache_dir}")
 
         # Perform process profiling for all critical processes
         for proc in self.reportStruct.critical_processes:
@@ -213,10 +212,9 @@ class FirmAE(EmulationEngines):
         return
         
     def check(self):
-        print(os.path.abspath(self.reportStruct.firware_path))
         command = ["sudo", "-E", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
         try:
-            log.log_message("info", "Elavated permissions are required, enter sudo password if prompted", "FirmAE")
+            log.message("info", "Elavated permissions are required, enter sudo password if prompted", "FirmAE")
             result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)
         except subprocess.CalledProcessError as e:
             return f"Error: {e.stderr}"
@@ -231,7 +229,7 @@ class FirmAE(EmulationEngines):
                     self.reportStruct.filesystem_path = self.PATH_TO_FIRMAE + "images/" + str(image_id) + ".tar.gz"
                     self.reportStruct.logs = self.PATH_TO_FIRMAE + "scratch/" + str(image_id) + "/"
                 else:
-                    log.log_message("error", "FirmAE failed miserably.", "FirmAE")
+                    log.message("error", "FirmAE failed miserably.", "FirmAE")
             db.close()
 
         self.analysis()
@@ -247,5 +245,4 @@ if __name__ == "__main__":
     # firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
     firmware_path = "/home/porichis/dit-thesis/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
     engine = FirmAE(firmware=firmware_path)
-    print(engine.reportStruct.firware_path)
     engine.check()

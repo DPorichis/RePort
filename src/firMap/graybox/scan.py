@@ -42,10 +42,10 @@ class CriticalBinary:
                     sha256.update(chunk)
                 return sha256.hexdigest()
         except FileNotFoundError:
-            log.log_message("error", f"File \"{self.path}\" was not found, SHA will not be calculated", "binary profiler")
+            log.message("error", f"File \"{self.path}\" was not found, SHA will not be calculated", "binary profiler")
             return 'BNF'
         except Exception as e:
-            print(f'[-] Graybox Monitor (binary profiler): An exception occured, SHA will not be calculated (Exception: {e})', file=sys.stderr)
+            log.message("warn", "An exception occured, SHA will not be calculated (Exception: {e})", "binary profiler")
             return 'EXP'
 
     def retrieve_version(self):
@@ -66,9 +66,10 @@ class CriticalBinary:
         return
     
     def print(self):
-        print(f"--- {self.name}'s Label ---")
-        print(f"- Path: {self.path}")
-        print(f"- Cert: {self.cert}")
-        print(f"- SHA256: {self.sha}")
-        print(f"- Possible versions: {self.version}")
-        print(f"- Ports opened: {self.ports}")
+        label = f"--- {self.name}'s Label ---\n"
+        label += f"- Path: {self.path}\n"
+        label += f"- Cert: {self.cert}\n"
+        label += f"- SHA256: {self.sha}\n"
+        label += f"- Possible versions: {self.version}\n"
+        label += f"- Ports opened: {self.ports}\n"
+        log.output(label)
