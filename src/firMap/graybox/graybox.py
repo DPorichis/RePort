@@ -42,7 +42,17 @@ def graybox(args):
     if args.engine_mode:
         opt = args.engine_mode3
 
+    log.message("info", "Initial systemcall tracking started")
     output = engine.check()
+
+    log.message("info", "Emulated port verification started")
+    engine.emulate()
+    log.message("info", "Nmap analysis on given target started")
+    engine.verification()
+    engine.terminate()
+    engine.result_output()
+
+
     log.output(output)
 
 

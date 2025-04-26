@@ -6,7 +6,10 @@ from firMap.blackbox.engines import NmapEngine
 import subprocess
 import psycopg2
 import tarfile
+import threading
 import shutil
+import signal
+import time
 import sys
 import os
 import re
@@ -49,7 +52,7 @@ class EmulationEngines(ABC):
         pass
 
     @abstractmethod
-    def emulate(self, ip, options):
+    def emulate(self):
         """
         Spawns an interactive emulation instance on the given ip. 
         This emulation needs to be terminated via the terminate() function.
@@ -95,13 +98,12 @@ class EmulationEngines(ABC):
         Performs blackbox verification on the emulated target
         """
         blackbox = NmapEngine(ip=self.reportStruct.ip_address)        
-        blackbox.scan()
+        blackbox.scan(self.reportStruct.ip_address, "advanced")
         for port in blackbox.reportStruct.ports.keys():
             if port in self.reportStruct.ports.keys():
                 self.reportStruct.ports[port]['verification'] = blackbox.reportStruct.ports[port]
             else:
                 self.reportStruct.ports[port] = {"owner":"Unkwown", 'verification': blackbox.reportStruct.ports[port]}
-
         return
 
 def list_all_engines():
@@ -133,6 +135,11 @@ class FirmAE(EmulationEngines):
     DATABASE_HOST = os.getenv("FIRMAE_DB_HOST", "localhost")
     DATABASE_PORT = os.getenv("FIRMAE_DB_PORT", "5432")
 
+    def __init__(self, reportStruct=None, firmware='', ip='192.168.0.1'):
+        if(reportStruct == None):
+            self.reportStruct = GrayBoxScan(firmware=firmware, ip_address=ip)
+            self.emulationProc = None
+
     def name(self):
         return "FirmAE"
     
@@ -156,6 +163,7 @@ class FirmAE(EmulationEngines):
 
         input_file = self.reportStruct.logs + 'qemu.initial.serial.log'
 
+        critical_processes = set()
         reverse_port_mapping = {}
         with open(input_file, 'r') as file:
             for line in file:
@@ -169,12 +177,12 @@ class FirmAE(EmulationEngines):
                         'protocol': match.group(3),
                         'port': int(match.group(4))
                     })
-                    self.reportStruct.critical_processes.add(match.group(2))
+                    critical_processes.add(match.group(2))
                     port = int(match.group(4))
                     if port in self.reportStruct.ports.keys():
-                        self.reportStruct.ports[port]['owners'].append(match.group(2))
+                        self.reportStruct.ports[port]['owners'].add(match.group(2))
                     else:
-                        self.reportStruct.ports[port] = {'owners':[match.group(2)], 'verification': None}
+                        self.reportStruct.ports[port] = {'owners':{match.group(2)}, 'verification': []}
                     proc = match.group(2)
                     if proc in reverse_port_mapping.keys():
                         reverse_port_mapping[proc].add(port)
@@ -197,7 +205,7 @@ class FirmAE(EmulationEngines):
             tar.extractall(path=cache_dir)
 
         # Perform process profiling for all critical processes
-        for proc in self.reportStruct.critical_processes:
+        for proc in critical_processes:
             possible_targets = self.find_binaries_by_name(proc, cache_dir)
             if(len(possible_targets) == 0):
                 possible_targets = ['']
@@ -205,6 +213,7 @@ class FirmAE(EmulationEngines):
             for target in possible_targets:
                 binary_label = self.binary_profiling(target, proc, list(reverse_port_mapping[proc]))
                 binary_label.print()
+                self.reportStruct.critical_processes[proc] = binary_label
 
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
@@ -235,11 +244,77 @@ class FirmAE(EmulationEngines):
         self.analysis()
         return
         
-    def emulate(self, ip, options):
+    def emulate(self):
+
+        def check_ready(process, target, result_flag):
+            for line in process.stdout:
+                print(line)
+                if target in line:
+                    result_flag['running'] = True
+                    break
+                if "RTNETLINK answers: File exists" in line:
+                    log.message("warn", f"Tap Device setup failed, (tap1_0 already exists)", "FirmAE -run")
+                    break
+
+        command = ["sudo", "-E", "./run.sh", "--run", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
+        # Start the process
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=self.PATH_TO_FIRMAE,
+            text=True,
+            bufsize=1
+        )
+
+        target_text = self.reportStruct.ip_address + " true true"
+        result = {'running': False}
+
+        # Start a thread to read output
+        reader_thread = threading.Thread(target=check_ready, args=(process, target_text, result))
+        reader_thread.start()
+
+        timeout_seconds = 180
+        reader_thread.join(timeout_seconds)
+
+        if reader_thread.is_alive():
+            log.message("warn", f"Emulation Timeout reached ({timeout_seconds} s). Firmware emulation exiting...")
+            process.terminate()
+            reader_thread.join()
+
+        if result['running']:
+            log.message("info", f"Firmware emulation open at IP {self.reportStruct.ip_address}.", "FirmAE -run")
+        else:
+            log.message("error", f"Firmware emulation failed.", "FirmAE -run")
+
+        self.emulationProc = process
         return
 
     def terminate(self):
+        
+        if self.emulationProc.poll() is not None:
+            log.message("warn", f"Emulation exited unexpectedly with return code {self.emulationProc.returncode}")
+        else:
+            os.kill(self.emulationProc.pid, signal.SIGINT)
+            try:
+                self.emulationProc.wait(timeout=20)
+                log.message("info", f"Firmware emulation exited cleanly.", "FirmAE -run")
+            except subprocess.TimeoutExpired:
+                print("warn", "Firmware emulation did not exit peacefully, proccess forced killed." "FirmAE -run")
+                self.emulationProc.kill()
         return
+    
+    def result_output(self):
+        for port in self.reportStruct.ports.keys():
+            output = f"[Port {port}]\n" + f"|-(Possible Owner)\n" 
+            for own in self.reportStruct.ports[port]["owners"]:
+                output += self.reportStruct.critical_processes[own].owner_print()
+            if len(self.reportStruct.ports[port]["verification"]) != 0:
+                output += f"-- Verified\n="
+            else:
+                output += f"-- Not Verified\n="
+            log.output(output)
+
 
 if __name__ == "__main__":
     # firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"

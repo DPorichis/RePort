@@ -15,7 +15,7 @@ class GrayBoxScan:
 
         self.logs = ""
         self.bind_calls = []
-        self.critical_processes = set()
+        self.critical_processes = {}
         self.ports = {}
 
     def io_md5(self, target):
@@ -65,11 +65,21 @@ class CriticalBinary:
         self.ports = ports
         return
     
-    def print(self):
-        label = f"--- {self.name}'s Label ---\n"
+    def print(self, identation=""):
+        label = ""
+        label += f"--- {self.name}'s Label ---\n"
         label += f"- Path: {self.path}\n"
         label += f"- Cert: {self.cert}\n"
         label += f"- SHA256: {self.sha}\n"
         label += f"- Possible versions: {self.version}\n"
         label += f"- Ports opened: {self.ports}\n"
         log.output(label)
+
+    def owner_print(self, identation="| |"):
+        label = ""
+        label += identation + f"-<{self.name}>\n"
+        label += identation + f" |-Path: {self.path}\n"
+        label += identation + f" |-Cert: {self.cert}\n"
+        label += identation + f" |-SHA256: {self.sha}\n"
+        label += identation + f" |-Possible versions: {self.version}\n"
+        return label
