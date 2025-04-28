@@ -124,8 +124,8 @@ def get_engine_by_name(name, firmware=''):
 
 class FirmAE(EmulationEngines):
 
-    PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
-    # PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
+    # PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
+    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
     flag_mapping = {"advanced": "-sV", "default": " "}
 
     DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
@@ -215,8 +215,8 @@ class FirmAE(EmulationEngines):
                 binary_label.print()
                 self.reportStruct.critical_processes[proc] = binary_label
 
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
+        # if os.path.exists(cache_dir):
+        #     shutil.rmtree(cache_dir)
 
         return
         
