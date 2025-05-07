@@ -156,57 +156,255 @@ class FirmAE(EmulationEngines):
         except Exception as e:
             log.message("error", f"Database connection failed: {e}", "FirmAE")
             return None
+        
+    class PortActivity:
+        def __init__(self):
+            self.critical_processes = set()
+            self.process_activity = {}
+            self.open_ports = {}
+            self.port_history = []
+
+            self.close_cache = []
+            self.close_cache_users = 0
+
+        def new_bind(self, timestamp, pid, fd, port, process_name):
+            if pid not in self.process_activity.keys():
+                self.process_activity[pid] = {}
+            
+            self.process_activity[pid][fd] = {'port': port, 'timestamp': timestamp}
+            self.critical_processes.add(process_name)
+
+            if port not in self.open_ports.keys():
+                self.open_ports[port] = {'owner': (process_name, pid), "access": [pid], "start": timestamp} 
+            else:
+                old = self.open_ports[port]
+                log.message("warn", f"Port {port} overidden from an other process ({self.open_ports[port]["owner"][0]} -> {process_name})")
+                self.port_history.append((port, old["owner"][0], old["owner"][1], old["start"], timestamp))
+                
+                self.open_ports[port] = {'owner': (process_name, pid), "access": [(process_name, pid)]}
+        
+        def new_close(self, timestamp, pid, fd):
+            if pid in self.process_activity.keys():
+                if fd in self.process_activity[pid].keys():
+                    port = self.process_activity[pid][fd]["port"]
+                    self.open_ports[port]["access"].remove(pid)
+                    if len(self.open_ports[port]["access"]) == 0:
+                        old = self.open_ports[port]
+                        self.port_history.append((port, old["owner"][0], old["owner"][1], old["start"], timestamp))
+                        del self.open_ports[port]
+                    del self.process_activity[pid][fd]
+
+            # If we are waiting for PID info of a fork, cache this close
+            if self.close_cache_users != 0:
+                self.close_cache_users -= 1
+
+        def new_exit(self, timestamp, pid):
+            if pid in self.process_activity.keys():
+                for fd in self.process_activity[pid].keys():
+                    port = self.process_activity[pid][fd]["port"]
+                    del self.process_activity[pid][fd]
+                    del self.open_ports[port]
+                    
+                    self.open_ports[port]["access"].remove(pid)
+                    if len(self.open_ports[port]["access"]) == 0:
+                        old = self.open_ports[port]
+                        self.port_history.append((port, old["owner"][0], old["owner"][1], old["start"], timestamp))
+                        del self.open_ports[port]
+                    del self.process_activity[pid][fd]
+
+            # If we are waiting for PID info of a fork, cache this close
+            if self.close_cache_users != 0:
+                self.close_cache_users -= 1
+
+        def inherit_from_fork(self, pid, child_pid):
+            if pid not in self.process_activity.keys():
+                self.process_activity[pid] = {}
+
+            if child_pid not in self.process_activity.keys():
+                self.process_activity[child_pid] = {}
+
+            for fd in self.process_activity[pid].keys():
+                self.process_activity[child_pid][fd] = self.process_activity[child_pid][fd]
+
+            for closure in close_activity_cache:
+                if closure[0] == child_pid:
+                    if closure[1] in self.process_activity[child_pid].keys():
+                        del self.process_activity[child_pid][fd]
+
+            for fd in self.process_activity[child_pid].keys():
+                port = self.process_activity[child_pid][fd]
+                self.open_ports[port]["access"].add(child_pid)
+            
+            pid_queue -= 1
+            if pid_queue == 0:
+                close_activity_cache = []
+
 
     def analysis(self):
-        bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
-        # close_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
 
-        input_file = self.reportStruct.logs + 'qemu.initial.serial.log'
+        # Pattern for retriving fork calls:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Clone Flags | 5 - Stack Size
+        fork_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+do_fork\[PID:\s*(\d+)\s+\(([^)]+)\)\]:\s+clone_flags:0x([0-9a-fA-F]+),\s+stack_size:0x([0-9a-fA-F]+)"
+        
+        # Pattern for retriving fork return values:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Child PID
+        fork_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+do_fork_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*(\d+)"
+        
+        # Pattern for retriving bind calls:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - fd | 5 - Family | 6 - Port
+        bind_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+sys_bind\[PID:\s*(\d+)\s+\(([^)]+)\)\]:\s+fd:(\d+)\s+family:(\d+)\s+port:\s*(\d+)"
+        
+        # Pattern for retriving bind return values:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Return Code
+        bind_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+sys_bind_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*(\d+)"
+        
+        # Patterns for retriving ipv4 and ipv6 bind calls:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Proto | 5 - Port
+        inet4_bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
+        inet6_bind_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+inet6_bind\[PID:\s+\d+\s+\((.*?)\)\]:\s+proto:(.*?),\s+port:(\d+)'
+        
+        # Pattern for retriving close calls:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - fd
+        close_pattern = r'\[\s*(\d+\.\d+)\]\s+firmadyne:\s+close\[PID:\s*(\d+)\s+\(([^)]+)\)\]:\s+fd:(\d+)'
+
+        input_file = self.reportStruct.logs + 'qemu.final.serial.log'
+
+        process_activity = {}
+        open_ports = {}
+
+        closed_ports = []
 
         critical_processes = set()
         reverse_port_mapping = {}
+
+        close_activity_cache = []
+        pid_queue = 0
+
         with open(input_file, 'r') as file:
             for line in file:
                 # Search for bind systemcalls
                 match = re.search(bind_pattern, line)
                 if match:
                     print(match)
-                    self.reportStruct.bind_calls.append({
-                        'timestamp': match.group(1),
-                        'process_name': match.group(2),
-                        'protocol': match.group(3),
-                        'port': int(match.group(4))
-                    })
-                    critical_processes.add(match.group(2))
-                    port = int(match.group(4))
-                    if port in self.reportStruct.ports.keys():
-                        self.reportStruct.ports[port]['owners'].add(match.group(2))
-                    else:
-                        self.reportStruct.ports[port] = {'owners':{match.group(2)}, 'verification': []}
-                    proc = match.group(2)
-                    if proc in reverse_port_mapping.keys():
-                        reverse_port_mapping[proc].add(port)
-                    else:
-                        reverse_port_mapping[proc] = set()
-                        reverse_port_mapping[proc].add(port)
+                    timestamp = float(match.group(1))
+                    pid = int(match.group(2))
+                    fd = int(match.group(4))                    
+                    family = int(match.group(5))
+                    print(family)
+                    port = int(match.group(6))
+                    if(family == 2 or family == 10):
+                        if pid not in process_activity.keys():
+                            process_activity[pid] = {}
+                        self.reportStruct.bind_calls.append({
+                            'timestamp': timestamp,
+                            'pid': pid,
+                            'process_name': match.group(3),
+                            'family': family,
+                            'port': port
+                        })
+                        process_activity[pid][fd] = {'port': port, 'timestamp': timestamp}
+                        critical_processes.add(match.group(3))
+                        if port in self.reportStruct.ports.keys():
+                            self.reportStruct.ports[port]['owners'].add(match.group(3))
+                        else:
+                            self.reportStruct.ports[port] = {'owners':{match.group(3)}, 'verification': []}
+                        proc = match.group(3)
+                        if proc in reverse_port_mapping.keys():
+                            reverse_port_mapping[proc][port] = {"start": timestamp}
+                        else:
+                            reverse_port_mapping[proc] = {}
+                            reverse_port_mapping[proc][port] = {"start": timestamp}
+                
+                # Search for fork patterns on PIDs with open ports
+                match = re.search(fork_pattern, line)
+                if match:
+                    timestamp = float(match.group(1))
+                    pid = int(match.group(2))
+                    fd = int(match.group(4))
+                    if pid in process_activity.keys():
+                        if fd in process_activity[pid].keys():
+
+                            # Check more lines here #
+                            port = process_activity[pid][fd]["port"]
+                            reverse_port_mapping[match.group(3)][port]["end"] = timestamp
+                            closed_ports.append(f"{match.group(3)}: Port {port} open from {reverse_port_mapping[match.group(3)][port]["start"]} until {reverse_port_mapping[match.group(3)][port]["end"]}")
+                            (f"Port {port}")
+                            del process_activity[pid][fd]
+
+                # Search for fork return patterns to assign activity
+                match = re.search(fork_ret_pattern, line)
+                if match:
+                    timestamp = float(match.group(1))
+                    pid = int(match.group(2))
+                    childpid = int(match.group(4))
+                    
+                    if pid not in process_activity.keys():
+                        process_activity[pid] = {}
+
+                    if childpid not in process_activity.keys():
+                        process_activity[childpid] = {}
+
+                    for fd in process_activity[pid].keys():
+                        process_activity[childpid][fd] = process_activity[childpid][fd]
+
+                    for closure in close_activity_cache:
+                        if closure[0] == childpid:
+                            if closure[1] in process_activity[childpid].keys():
+                               del process_activity[childpid][fd]
+
+                    for fd in process_activity[childpid].keys():
+                        port = process_activity[childpid][fd]
+                        open_ports[port]["access"].add(childpid)
+                    
+                    pid_queue -= 1
+                    if pid_queue == 0:
+                        close_activity_cache = []
+
+
+                    if pid in process_activity.keys():
+                        if fd in process_activity[pid].keys():
+
+                            port = process_activity[pid][fd]["port"]
+                            reverse_port_mapping[match.group(3)][port]["end"] = timestamp
+                            closed_ports.append(f"{match.group(3)}: Port {port} open from {reverse_port_mapping[match.group(3)][port]["start"]} until {reverse_port_mapping[match.group(3)][port]["end"]}")
+                            (f"Port {port}")
+                            del process_activity[pid][fd]
 
                 # Search for close syscalls on file descriptors that we care about
-                # (Not supported by FirmAE)
+                match = re.search(close_pattern, line)
+                if match:
+                    timestamp = float(match.group(1))
+                    pid = int(match.group(2))
+                    fd = int(match.group(4))
+                    if pid in process_activity.keys():
+                        if fd in process_activity[pid].keys():
+                            port = process_activity[pid][fd]["port"]
+                            reverse_port_mapping[match.group(3)][port]["end"] = timestamp
+                            open_ports[port]["access"].remove(pid)
+                            
+                            closed_ports.append(f"{match.group(3)}: Port {port} open from {reverse_port_mapping[match.group(3)][port]["start"]} until {reverse_port_mapping[match.group(3)][port]["end"]}")
+                            (f"Port {port}")
+                            del process_activity[pid][fd]
+
+                    # If we are waiting for PID info of a fork, cache this close
+                    if pid_queue != 0:
+                        close_activity_cache.append((pid,fd))
 
         for entry in self.reportStruct.bind_calls:
             log.output(entry)
         
         # Decompress the file system for analysis
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        cache_dir = os.path.join(script_dir, "cache")
-        os.makedirs(cache_dir, exist_ok=True)
+        # script_dir = os.path.dirname(os.path.abspath(__file__))
+        # cache_dir = os.path.join(script_dir, "cache")
+        # os.makedirs(cache_dir, exist_ok=True)
 
-        with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
-            tar.extractall(path=cache_dir)
+        # with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
+        #     tar.extractall(path=cache_dir)
 
         # Perform process profiling for all critical processes
         for proc in critical_processes:
-            possible_targets = self.find_binaries_by_name(proc, cache_dir)
+            possible_targets = []
+            # possible_targets = self.find_binaries_by_name(proc, cache_dir)
             if(len(possible_targets) == 0):
                 possible_targets = ['']
             cert = 10/len(possible_targets)
@@ -217,6 +415,8 @@ class FirmAE(EmulationEngines):
 
         # if os.path.exists(cache_dir):
         #     shutil.rmtree(cache_dir)
+        for item in closed_ports:
+            print(item)
 
         return
         
