@@ -4,21 +4,38 @@ import sys
 import subprocess
 import hashlib
 from firMap.utils import Logger
+from datetime import datetime
 
 log = Logger("Graybox Monitor")
 class GrayBoxScan:
     def __init__(self, firmware='', fs='', ip_address=None, brand='unknown'):
-        self.black_verification = None
-        self.ip_address = ip_address
+        
+        #### Important Paths ####
         self.firware_path = firmware
         self.filesystem_path = fs
-        self.brand = brand
-        self.md5_hash = self.io_md5(self.firware_path)
+        self.report_folder = os.path.basename(firmware) + "-" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-        self.logs = ""
-        self.bind_calls = []
-        self.critical_processes = {}
-        self.ports = {}
+        # Find base directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
+
+        # Make the reports folder if it doesn't exist already
+        os.makedirs(os.path.join(base_dir, "reports"), exist_ok=True)
+
+        # Create the report folder for this analysis
+        self.report_path = os.path.join(os.path.join(os.path.join(base_dir, "reports")), self.report_folder)
+        os.makedirs(self.report_path, exist_ok=True)
+
+        # Blackbox Verification Information
+        self.black_verification = None
+        self.ip_address = ip_address
+    
+        # Firmware ID
+        self.md5_hash = self.io_md5(self.firware_path)
+        self.brand = brand
+
+        # Port Logs
+        self.port_activity = PortActivity()
 
     def io_md5(self, target):
         """
@@ -33,7 +50,149 @@ class GrayBoxScan:
                 hasher.update(buf)
                 buf = ifp.read(blocksize)
             return hasher.hexdigest()
+        
+class PortActivity:
+    def __init__(self):
+        self.critical_processes = set()
+        self.process_activity = {}
+        self.open_ports = {}
+        self.ports_used = set()
+        self.port_history = {}
+        
+        self.close_cache = []
+        self.close_cache_users = 0
 
+    def new_bind(self, timestamp, pid, fd, port, process_name, family, type):
+        if pid not in self.process_activity.keys():
+            self.process_activity[pid] = {}
+        
+        self.process_activity[pid][fd] = {'port': port, 'timestamp': timestamp, 'family': family, 'type': type}
+        self.critical_processes.add(process_name)
+
+        if port not in self.open_ports.keys():
+            self.ports_used.add(port)
+            self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp} 
+        else:
+            # if self.open_ports[port]["owner"][1] != pid:    
+                old = self.open_ports[port]
+                log.message("warn", f"Port {port} overidden from an other process ({self.open_ports[port]["owner"][0]} -> {process_name})")
+                if port not in self.port_history.keys():
+                    self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
+                                                            "times": (old["start"], timestamp),
+                                                            "access_history": old["access_history"]
+                                                            }]}
+                else:
+                    self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
+                                                            "times": (old["start"], timestamp),
+                                                            "access_history": old["access_history"]
+                                                            })
+
+                self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp}
+    
+    def update_port_info(self, pid, fd=-1, port=-1):
+        return
+
+    def new_close(self, timestamp, pid, fd):
+        if pid in self.process_activity.keys():
+            if fd in self.process_activity[pid].keys():
+                port = self.process_activity[pid][fd]["port"]
+                if port not in self.open_ports.keys():
+                    log.message("error", "Jim did something wrong", "Jim")
+                    del self.process_activity[pid][fd]
+                    return
+                self.open_ports[port]["access"].remove(pid)
+                if len(self.open_ports[port]["access"]) == 0:
+                    old = self.open_ports[port]
+                    if port not in self.port_history.keys():
+                        self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
+                                                                "times": (old["start"], timestamp),
+                                                                "access_history": old["access_history"]
+                                                                }]}
+                    else:
+                        self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
+                                                                "times": (old["start"], timestamp),
+                                                                "access_history": old["access_history"]
+                                                                })
+                    
+                    log.message("warn", f"{port} deleted due to closure of last", "Jim")
+                    del self.open_ports[port]
+                del self.process_activity[pid][fd]
+
+        # If we are waiting for PID info of a fork, cache this close
+        if self.close_cache_users != 0:
+            self.close_cache.append((pid, fd))
+
+    def new_exit(self, timestamp, pid):
+        if pid in self.process_activity.keys():
+            for fd in self.process_activity[pid].keys():
+                # Update the port that this PID no longer has access to this port
+                port = self.process_activity[pid][fd]["port"]
+                if port not in self.open_ports.keys():
+                    log.message("error", "Jim did something wrong", "Jim")
+                    continue
+                if pid in self.open_ports[port]["access"]:
+                    self.open_ports[port]["access"].remove(pid)
+
+                # Check if all accessors of the port have closed their fd
+                if len(self.open_ports[port]["access"]) == 0:
+                    old = self.open_ports[port]
+                    if port not in self.port_history.keys():
+                        self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
+                                                                "times": (old["start"], timestamp),
+                                                                "access_history": old["access_history"]
+                                                                }]}
+                    else:
+                        self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
+                                                                "times": (old["start"], timestamp),
+                                                                "access_history": old["access_history"]
+                                                                })                    
+                    log.message("warn", f"{port} deleted", "Jim")
+                    del self.open_ports[port]
+                
+            # Delete this instance
+            del self.process_activity[pid]
+    
+    def new_fork(self):
+        self.close_cache_users += 1
+
+    def inherit_from_fork(self, pid, child_pid):
+        if pid not in self.process_activity.keys():
+            self.process_activity[pid] = {}
+
+        if child_pid not in self.process_activity.keys():
+            self.process_activity[child_pid] = {}
+
+        for fd in self.process_activity[pid].keys():
+            self.process_activity[child_pid][fd] = self.process_activity[pid][fd]
+
+        for closure in self.close_cache:
+            if closure[0] == child_pid:
+                if closure[1] in self.process_activity[child_pid].keys():
+                    del self.process_activity[child_pid][closure[1]]
+
+        for fd in self.process_activity[child_pid].keys():
+            port = self.process_activity[child_pid][fd]["port"]
+            self.open_ports[port]["access"].add(child_pid)
+            self.open_ports[port]["access_history"].add(child_pid)
+        
+        self.close_cache_users -= 1
+        if self.close_cache_users == 0:
+            self.close_cache = []
+
+    def end(self):
+        for port in self.open_ports.keys():
+            old = self.open_ports[port]
+            if port not in self.port_history.keys():
+                self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
+                                                        "times": (old["start"], "END"),
+                                                        "access_history": old["access_history"]
+                                                        }]}
+            else:
+                self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
+                                                        "times": (old["start"], "END"),
+                                                        "access_history": old["access_history"]
+                                                        })
+                        
 
 class CriticalBinary:
     def compute_sha256(self):

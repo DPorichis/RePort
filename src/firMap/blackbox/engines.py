@@ -67,7 +67,7 @@ def get_engine_by_name(name):
 
 class NmapEngine(MappingEngine):
 
-    flag_mapping = {"advanced": "-sV", "default": " "}
+    flag_mapping = {"advanced": "-sV", "default": ""}
 
     def name(self):
         return "nmap"
@@ -84,16 +84,29 @@ class NmapEngine(MappingEngine):
             service_tag = port_tag.find('service')
 
             state = state_tag.get('state') 
-            service = service_tag.get('name')
-            conf = service_tag.get('conf')
+            
+            service = "Unknown"
+            conf = 0
+
+            if service_tag is not None:
+                service = service_tag.get('name')
+                conf = service_tag.get('conf')
             log.output(f"Protocol: {protocol}, Port ID: {port}, State: {state}, Service: {service} [confidence {conf}]")
             self.reportStruct.add_port(port=int(port), protocol=protocol, service=service, state=state, conf=int(conf), engine=self.name())
         
         return self.reportStruct
 
-    def scan(self, ip=None, options='default'):
+    def scan(self, ip=None, options='default', specific_ports=[]):
+        if len(specific_ports) != 0:
+            ports_str = ",".join(map(str, specific_ports))
+            port_args = ["-p", ports_str]
+        
         export_to_xml = '-oX -'
         command = ['nmap'] + export_to_xml.split()
+        if len(specific_ports) != 0:
+            ports_str = ",".join(map(str, specific_ports))
+            command += ["-p", ports_str]
+        
         mapped_option = self.flag_mapping.get(options)
         if mapped_option:
             command += mapped_option.split()
@@ -104,6 +117,9 @@ class NmapEngine(MappingEngine):
         command += [ip]
         try:
             result = subprocess.run(command, capture_output=True, text=True, check=True)
+            print(result.stdout)
+            
+            
             return self.parser(result.stdout)
         except subprocess.CalledProcessError as e:
             return f"Error: {e.stderr}"

@@ -11,7 +11,7 @@ def graybox(args):
     if args.le:
         list_all_engines()
         return
-    
+        
     if args.engine_help:
         help_engine = get_engine_by_name(args.engine_help)
         if help_engine is None:
@@ -41,6 +41,16 @@ def graybox(args):
     opt = 'default'
     if args.engine_mode:
         opt = args.engine_mode3
+
+    if args.cleanup:
+        log.message("warn", "Performing Engine Cleanup", engine.name())
+        engine.clean_up()
+        return
+
+    if args.network_fix:
+        log.message("warn", "Performing Network Fix", engine.name())
+        engine.network_fix()
+        return
 
     log.message("info", "Initial systemcall tracking started")
     output = engine.check()
