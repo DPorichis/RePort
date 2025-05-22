@@ -28,10 +28,13 @@ class Logger:
             with open(self.log_file, "a") as f:
                 print(output, file=f)
 
-
     def output(self, message):
         print(message)
         # Log to the file, when given
         if(self.output_file is not None):
             with open(self.log_file, "a") as f:
                 print(message, file=f)
+
+
+    def html_report(self, graybox):
+        return

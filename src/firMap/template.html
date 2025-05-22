@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RePort - Attack Surface Mapping</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background-color: #f9f9f9;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .header-logo {
+      width: 48px;
+      height: 48px;
+      background: #ccc;
+      border-radius: 4px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+    .subtitle {
+      float: right;
+      font-weight: normal;
+      margin-top: 0px;
+    }
+    .section {
+      max-width: 1200px;
+      margin-top: 40px;
+      margin: 40px auto 0 auto; 
+    }
+    .footer {
+      max-width: 1200px;
+      margin: 20px auto 0 auto;
+      text-align: center;
+    }
+    .stats-box {
+      background-color: #ddd;
+      padding: 20px;
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 30px;
+      margin-top: 10px;
+    }
+    .stats-box label {
+      font-weight: normal;
+    }
+    .stats-box span {
+      display: inline-block;
+      width: 100%;
+      height: 20px;
+      background-color: white;
+      padding: 5px 5px;
+      border-radius: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #ddd;
+    }
+    .section-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header">
+  <div class="header-logo"></div>
+  <h1>RePort</h1>
+  </div>
+  <div class="subtitle">Attack Surface Mapping</div>
+</div>
+
+<div class="section">
+  <div class="section-title">RePort Stats</div>
+  <div class="stats-box">
+    <div><label>Firmware Name:</label> <span>{{ firmware_name }}</span></div>
+    <div><label>Mode:</label> <span>{{ mode }}</span></div>
+    <div><label>MD5 Hash:</label> <span>{{ md5_hash }}</span></div>
+    <div><label>Blackbox Engine:</label> <span>{{ blackbox_engine }}</span></div>
+    <div><label>Result:</label> <span>{{ result }}</span></div>
+    <div><label>Graybox Engine:</label> <span>{{ graybox_engine }}</span></div>
+    <div><label>RePort Folder:</label> <span>{{ report_folder }}</span></div>
+    <div><label>CVE Lookup:</label> <span>{{ cve_lookup }}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Port Activity Found</div>
+  <table>
+    <tr>
+      <th>Port</th>
+      <th>Type</th>
+      <th>Binded by</th>
+      <th>Timeframe</th>
+      <th>Verified</th>
+      <th>CVE Found</th>
+    </tr>
+    {% for port in port_activity %}
+    <tr>
+      <td>{{ port.port }}</td>
+      <td>{{ port.type }}</td>
+      <td>{{ port.binded_by }}</td>
+      <td>{{ port.timeframe }}</td>
+      <td>{{ port.verified }}</td>
+      <td>{{ port.cve_found }}</td>
+    </tr>
+    {% endfor %}
+    <tr><td colspan="6">&nbsp;</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">CVE Report</div>
+  <table>
+    <tr>
+      <th>CVE</th>
+      <th>Binary</th>
+      <th>Rating</th>
+      <th>Ports Opened by that binary</th>
+    </tr>
+    {% for cve in cve_report %}
+    <tr>
+      <td>{{ cve.cve_id }}</td>
+      <td>{{ cve.binary }}</td>
+      <td>{{ cve.rating }}</td>
+      <td>{{ cve.ports_opened }}</td>
+    </tr>
+    {% endfor %}
+    <tr><td colspan="4">&nbsp;</td></tr>
+  </table>
+</div>
+
+<div class="footer">
+  <p>
+    <a href="https://github.com/RePort-FEMU" target="_blank">RePort</a> 2025 © All Rights Reserved</br>
+  Developed by <a href="https://github.com/DPorichis" target="_blank">DPorichis</a>
+  </p>
+</div>
+
+</body>
+</html>

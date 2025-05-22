@@ -101,10 +101,11 @@ class EmulationEngines(ABC):
         blackbox = NmapEngine(ip=self.reportStruct.ip_address)        
         blackbox.scan(self.reportStruct.ip_address, "advanced", self.reportStruct.port_activity.ports_used)
         for port in blackbox.reportStruct.ports.keys():
-            if port in self.reportStruct.port_activity.ports_used:
-                self.reportStruct.ports[port]['verification'] = blackbox.reportStruct.ports[port]
-            else:
-                self.reportStruct.ports[port] = {"owner":"Unkwown", 'verification': blackbox.reportStruct.ports[port]}
+            if blackbox.reportStruct.ports[port][0]["state"] == "open" and port in self.reportStruct.port_activity.ports_used:
+                if port in self.reportStruct.port_activity.port_history.keys():
+                    self.reportStruct.port_activity.port_history[port]["verification"] = blackbox.reportStruct.ports[port][0]
+                else:
+                    log.message("warn", f"Port {port} was found open, but no logs of it where tracked", "Graybox Verification")
         return
 
     @abstractmethod
@@ -199,6 +200,7 @@ class FirmAE(EmulationEngines):
 
         input_file = self.reportStruct.logs + 'qemu.final.serial.log'
 
+        log.message("info", "Analyzing systemcalls.", "FirmAE")
         with open(input_file, 'r') as file:
             process_activity = {}
 
@@ -214,13 +216,11 @@ class FirmAE(EmulationEngines):
                 # Search for bind systemcalls
                 match = re.search(bind_pattern, line)
                 if match:
-                    print(match)
                     timestamp = float(match.group(1))
                     pid = int(match.group(2))
                     proc_name = match.group(3)
                     fd = int(match.group(4))                    
                     family = int(match.group(5))
-                    print(family)
                     port = int(match.group(6))
                     if(family == 2 or family == 10):
                         bind_cache[pid] = {"timestamp":timestamp, 
@@ -235,7 +235,6 @@ class FirmAE(EmulationEngines):
                 # Search for ipv4 bind to retrive port type
                 match = re.search(inet4_bind_pattern, line)
                 if match:
-                    print(match)
                     # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Proto | 5 - Port
                     timestamp = float(match.group(1))
                     pid = int(match.group(2))
@@ -249,7 +248,6 @@ class FirmAE(EmulationEngines):
                 # Search for ipv6 bind to retrive port type
                 match = re.search(inet6_bind_pattern, line)
                 if match:
-                    print(match)
                     # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Proto | 5 - Port
                     timestamp = float(match.group(1))
                     pid = int(match.group(2))
@@ -315,6 +313,7 @@ class FirmAE(EmulationEngines):
                     pid = int(match.group(2))
                     self.reportStruct.port_activity.new_exit(timestamp, pid)
 
+        self.reportStruct.port_activity.end()
 
         for port in self.reportStruct.port_activity.port_history.keys():
             item = self.reportStruct.port_activity.port_history[port]
@@ -332,7 +331,43 @@ class FirmAE(EmulationEngines):
         with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
             tar.extractall(path=cache_dir)
 
-        # Retrive all execv calls from 
+        # # Retrive all execv calls from critical PIDS
+        # log.message("info", "Associating Ports to executables.", "FirmAE")
+
+        # # Pattern for retriving execve argument values:
+        # # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - argv | 5 - PATH | 6 - HOME | 7 - SHELL
+        # execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*\[\s*([^\]]+?)\s*],\s*envp:\s*PATH=([^ ]+)\s+HOME=([^ ]+)\s+SHELL=([^\s]+)"
+
+        # with open(input_file, 'r') as file:
+        #     process_activity = {}
+
+        #     critical_processes = set()
+        #     reverse_port_mapping = {}
+
+        #     # Bind cache for each PID
+        #     bind_cache = {}
+
+        #     for line in file:
+
+        #         # Search for execve systemcalls
+        #         match = re.search(execve_pattern, line)
+        #         if match:
+        #             timestamp = float(match.group(1))
+        #             pid = int(match.group(2))
+        #             proc_name = match.group(3)
+        #             fd = int(match.group(4))                    
+        #             family = int(match.group(5))
+        #             port = int(match.group(6))
+        #             if(family == 2 or family == 10):
+        #                 bind_cache[pid] = {"timestamp":timestamp, 
+        #                                    "pid": pid,
+        #                                    "fd": fd, 
+        #                                    "port": port,
+        #                                    "name": proc_name,
+        #                                    "family": family,
+        #                                    "type": "unknown"
+        #                                 }
+
 
         # Perform process profiling for all critical processes
         for proc in critical_processes:
@@ -485,15 +520,30 @@ class FirmAE(EmulationEngines):
 
     
     def result_output(self):
-        for port in self.reportStruct.ports.keys():
-            output = f"[Port {port}]\n" + f"|-(Possible Owner)\n" 
-            for own in self.reportStruct.ports[port]["owners"]:
-                output += self.reportStruct.critical_processes[own].owner_print()
-            if len(self.reportStruct.ports[port]["verification"]) != 0:
-                output += f"-- Verified\n="
+
+        for port in self.reportStruct.port_activity.port_history.keys():
+            item = self.reportStruct.port_activity.port_history[port]
+            output = f"[Port {port}]\n"
+            for instance in item["instances"]:
+                output += f"|-[Instance]\n"
+                output += f"| |- Owner: {instance["owner"][0]}({instance["owner"][1]})]\n"
+                output += f"| |- Access: {instance["access_history"]}]\n"
+                output += f"| |- Timestamps: {instance["times"][0]} - {instance["times"][1]}]\n"
+            if item["verification"] is not None:
+                output += f"|-(Verified)\n="
             else:
-                output += f"-- Not Verified\n="
+                output += f"|-(Not Verified)\n="
             log.output(output)
+
+        # for port in self.reportStruct.ports.keys():
+        #     output = f"[Port {port}]\n" + f"|-(Possible Owner)\n" 
+        #     for own in self.reportStruct.ports[port]["owners"]:
+        #         output += self.reportStruct.critical_processes[own].owner_print()
+        #     if len(self.reportStruct.ports[port]["verification"]) != 0:
+        #         output += f"-- Verified\n="
+        #     else:
+        #         output += f"-- Not Verified\n="
+        #     log.output(output)
 
 if __name__ == "__main__":
     # firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"

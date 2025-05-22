@@ -80,7 +80,9 @@ class PortActivity:
                     self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
                                                             "access_history": old["access_history"]
-                                                            }]}
+                                                            }],
+                                                "verification": None
+                                                }
                 else:
                     self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
@@ -107,7 +109,9 @@ class PortActivity:
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
                                                                 "access_history": old["access_history"]
-                                                                }]}
+                                                                }],
+                                                    "verification": None
+                                                    }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
@@ -140,7 +144,9 @@ class PortActivity:
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
                                                                 "access_history": old["access_history"]
-                                                                }]}
+                                                                }],
+                                                    "verification": None            
+                                                    }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
@@ -186,7 +192,9 @@ class PortActivity:
                 self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                         "times": (old["start"], "END"),
                                                         "access_history": old["access_history"]
-                                                        }]}
+                                                        }],
+                                            "verification": None
+                                            }
             else:
                 self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                         "times": (old["start"], "END"),
