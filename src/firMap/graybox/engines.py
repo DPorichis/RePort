@@ -9,6 +9,7 @@ import tarfile
 import threading
 import shutil
 import signal
+import shlex
 import time
 import glob
 import sys
@@ -331,55 +332,129 @@ class FirmAE(EmulationEngines):
         with tarfile.open(self.reportStruct.filesystem_path, "r:gz") as tar:
             tar.extractall(path=cache_dir)
 
-        # # Retrive all execv calls from critical PIDS
-        # log.message("info", "Associating Ports to executables.", "FirmAE")
+        log.message("info", "Fixing Symlinks in the report folder.", "FirmAE")
 
-        # # Pattern for retriving execve argument values:
-        # # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - argv | 5 - PATH | 6 - HOME | 7 - SHELL
+        links = 0
+        fixed = 0
+
+        for dirpath, dirnames, filenames in os.walk(cache_dir):
+            for name in dirnames + filenames:
+                path = os.path.join(dirpath, name)
+
+                if os.path.islink(path) and not os.path.exists(path):
+                    links += 1
+                    target = os.readlink(path)
+                    
+                    # Attempt to fix the path
+                    new_target = os.path.join(cache_dir, target.lstrip("/"))
+                    
+                    if os.path.exists(new_target):
+                        os.remove(path)
+                        os.symlink(new_target, path)
+                        fixed += 1
+
+        log.message("warn", f"{fixed}/{links} Symlinks were successfully fixed", "FirmAE")
+
+        # Retrive all execv calls from critical PIDS
+        log.message("info", "Associating Ports to executables.", "FirmAE")
+
+        # Pattern for retriving execve argument values:
+        # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - argv | 5 - env
         # execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*\[\s*([^\]]+?)\s*],\s*envp:\s*PATH=([^ ]+)\s+HOME=([^ ]+)\s+SHELL=([^\s]+)"
+        execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*([^\]]+?),\s*envp:\s*(.+)"
 
-        # with open(input_file, 'r') as file:
-        #     process_activity = {}
+        print(f"Pid matched: {self.reportStruct.port_activity.critical_processes}")
+        pid_to_binary = {}
+        critical_binaries = {}
+        with open(input_file, 'r') as file:
 
-        #     critical_processes = set()
-        #     reverse_port_mapping = {}
+            for line in file:
 
-        #     # Bind cache for each PID
-        #     bind_cache = {}
+                # Search for execve systemcalls
+                match = re.search(execve_pattern, line)
+                if match:
+                    pid = int(match.group(2))
+                    if pid in self.reportStruct.port_activity.critical_processes:
+                        # print(f"Pid matched: {pid}")
+                        timestamp = float(match.group(1))
+                        proc_name = match.group(3)
+                        argv = match.group(4)
+                        env = match.group(5)
+                        env_vars = dict(kv.split("=", 1) for kv in env.split() if "=" in kv)
 
-        #     for line in file:
+                        home = env_vars.get("HOME", "")
+                        path = env_vars.get("PATH", "")
+                        shell = env_vars.get("SHELL", "")
+                        
 
-        #         # Search for execve systemcalls
-        #         match = re.search(execve_pattern, line)
-        #         if match:
-        #             timestamp = float(match.group(1))
-        #             pid = int(match.group(2))
-        #             proc_name = match.group(3)
-        #             fd = int(match.group(4))                    
-        #             family = int(match.group(5))
-        #             port = int(match.group(6))
-        #             if(family == 2 or family == 10):
-        #                 bind_cache[pid] = {"timestamp":timestamp, 
-        #                                    "pid": pid,
-        #                                    "fd": fd, 
-        #                                    "port": port,
-        #                                    "name": proc_name,
-        #                                    "family": family,
-        #                                    "type": "unknown"
-        #                                 }
+                        argv_list = shlex.split(argv)
+                        path_list = path.split(':')
+                        print(argv_list)
+
+                        cmd = argv_list[0]
+                        possible_locations = []
 
 
+                        if cmd == "sh":
+                            # Find the bash script
+                            for arg in argv_list:
+                                if arg != "sh" and arg[0] != '-':
+                                    cmd = arg
+                                    break
+
+                        # Absolute path call - Assign to the path directly
+                        if cmd[0] == "/":
+                            cmd = argv_list[0].lstrip("/")
+                            target_binary = os.path.join(cache_dir, cmd)
+                            possible_locations.append(target_binary)
+
+                        # Create a possible path for each item inside of the $PATH
+                        for p in path_list:
+                            folder = p.lstrip("/")
+                            target_binary = os.path.join(cache_dir, folder, cmd)
+                            possible_locations.append(target_binary)
+
+                        # Check if this file exists or not
+                        item = None
+                        for target in possible_locations:
+                            if os.path.isfile(target):
+                                item = (timestamp, target, argv)
+                                print(f"Found binary file at: {target}")
+                                break
+                        
+                        # If it doesn't exist just add it as unknown path
+                        if item is None:
+                            log.message("warn", "No binary found")
+                            item = (timestamp, "Unknown", argv)
+                        
+                        if pid not in pid_to_binary.keys():
+                            pid_to_binary[pid] = [item]
+                        else:
+                            exists = False
+                            for other in pid_to_binary[pid]:
+                                if item[1] == other[1] and item[2] == other[2]:
+                                    exists = True
+                                    break
+                            if not exists:
+                                pid_to_binary[pid].append(item)
+                        
+                        if item[1] != "Unknown":
+                            if item[1] not in critical_binaries.keys():
+                                critical_binaries[target] = {"pids": set()}
+                            critical_binaries[target]["pids"].add(pid)
+
+        print(critical_binaries)
+        for pid in pid_to_binary.keys():
+            print(f"PID: {pid} | {pid_to_binary[pid]}")
         # Perform process profiling for all critical processes
-        for proc in critical_processes:
-            possible_targets = []
-            # possible_targets = self.find_binaries_by_name(proc, cache_dir)
-            if(len(possible_targets) == 0):
-                possible_targets = ['']
-            cert = 10/len(possible_targets)
-            for target in possible_targets:
-                binary_label = self.binary_profiling(target, proc, list(reverse_port_mapping[proc]))
-                binary_label.print()
-                self.reportStruct.critical_processes[proc] = binary_label
+        for binary in critical_binaries.keys():
+            # Find all ports that can me accessed by this binary
+            ports = set()
+            for pid in critical_binaries[binary]["pids"]:
+                for port in self.reportStruct.port_activity.pid_to_ports[pid]["access"]:
+                    ports.add(port)
+            binary_label = self.binary_profiling(binary, "", list(ports))
+            binary_label.print()
 
         return
         

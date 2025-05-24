@@ -58,6 +58,7 @@ class PortActivity:
         self.open_ports = {}
         self.ports_used = set()
         self.port_history = {}
+        self.pid_to_ports = {}
         
         self.close_cache = []
         self.close_cache_users = 0
@@ -67,7 +68,7 @@ class PortActivity:
             self.process_activity[pid] = {}
         
         self.process_activity[pid][fd] = {'port': port, 'timestamp': timestamp, 'family': family, 'type': type}
-        self.critical_processes.add(process_name)
+        self.critical_processes.add(int(pid))
 
         if port not in self.open_ports.keys():
             self.ports_used.add(port)
@@ -168,6 +169,9 @@ class PortActivity:
         if child_pid not in self.process_activity.keys():
             self.process_activity[child_pid] = {}
 
+        if pid in self.critical_processes:
+            self.critical_processes.add(int(child_pid))
+
         for fd in self.process_activity[pid].keys():
             self.process_activity[child_pid][fd] = self.process_activity[pid][fd]
 
@@ -200,8 +204,15 @@ class PortActivity:
                                                         "times": (old["start"], "END"),
                                                         "access_history": old["access_history"]
                                                         })
-                        
 
+        for port in self.port_history.keys():
+            for instance in self.port_history[port]["instances"]:
+                for pid in instance["access_history"]:
+                    if pid not in self.pid_to_ports.keys():
+                        self.pid_to_ports[pid] = {"access": set(),
+                                            "owns": set()}
+                    self.pid_to_ports[pid]["access"].add(port)
+                self.pid_to_ports[instance["owner"][1]]["owns"].add(port)
 class CriticalBinary:
     def compute_sha256(self):
         try:
