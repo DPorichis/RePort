@@ -14,6 +14,8 @@ def main():
     input_group.add_argument('-firmware', type=str, help="Path to the firmware to be scanned")
 
     parser.add_argument('-le', action='store_true', help="Lists all engines available for the specified scan type")
+    parser.add_argument('-cleanup', action='store_true', help="Removes all logs created by the specified engine, reseting functionality")
+    parser.add_argument('-network-fix', action='store_true', help="Resets network that may have been left hanging")
     parser.add_argument('-engine', type=str, help="Selects engine to be used")
     parser.add_argument('-engine-mode', type=str, metavar='MODE', help="Selects on which mode the engine will be run")
     parser.add_argument('-engine-help', type=str, metavar='ENGINE', help="Prints the help text of the specified ENGINE")
