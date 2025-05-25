@@ -531,7 +531,7 @@ class FirmAE(EmulationEngines):
         reader_thread = threading.Thread(target=check_ready, args=(process, target_text, result))
         reader_thread.start()
 
-        timeout_seconds = 180
+        timeout_seconds = 360
         reader_thread.join(timeout_seconds)
 
         if reader_thread.is_alive():

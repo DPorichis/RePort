@@ -55,16 +55,14 @@ def graybox(args):
     log.message("info", "Initial systemcall tracking started")
     output = engine.check()
 
+    log.message("info", "Emulated port verification started")
+    engine.emulate()
+    log.message("info", "Nmap analysis on given target started")
+    engine.verification()
+    engine.terminate()
+    engine.result_output()
+
     Logger.generate_graybox_report(engine, engine.reportStruct)
-    
-
-    # log.message("info", "Emulated port verification started")
-    # engine.emulate()
-    # log.message("info", "Nmap analysis on given target started")
-    # engine.verification()
-    # engine.terminate()
-    # engine.result_output()
-
 
     log.output(output)
 
