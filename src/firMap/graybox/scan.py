@@ -53,13 +53,28 @@ class GrayBoxScan:
         
 class PortActivity:
     def __init__(self):
+        # Set of all PIDs that have access to ports
         self.critical_processes = set()
+
+        # Dictionary tracking the PIDs activity over ports
         self.process_activity = {}
+
+        # Dictionary tracking what ports are at use at any given time and by whom
         self.open_ports = {}
+
+        # Set of all ports utilized by the firmware
         self.ports_used = set()
+
+        # Detailed dictionary of all actions on ports
         self.port_history = {}
+
+        # PID to Ports mapping        
         self.pid_to_ports = {}
-        
+
+        # Path to Ports and CVE mapping
+        self.binary_report = {}
+
+        # Cache for updating the state
         self.close_cache = []
         self.close_cache_users = 0
 
@@ -213,6 +228,7 @@ class PortActivity:
                                             "owns": set()}
                     self.pid_to_ports[pid]["access"].add(port)
                 self.pid_to_ports[instance["owner"][1]]["owns"].add(port)
+
 class CriticalBinary:
     def compute_sha256(self):
         try:
@@ -294,7 +310,7 @@ class CriticalBinary:
         label += f"- Cert: {self.cert}\n"
         label += f"- SHA256: {self.sha}\n"
         label += f"- Possible versions: {self.version_found}\n"
-        label += f"- Ports opened: {self.ports}\n"
+        label += f"- Ports opened: {self.ports}"
         log.output(label)
 
     def owner_print(self, identation="| |"):

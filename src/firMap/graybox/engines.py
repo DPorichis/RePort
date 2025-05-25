@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
+from firMap.graybox.lookup import CveLookup
 from firMap.graybox.scan import *
 from ..utils import Logger
 from firMap.blackbox.engines import NmapEngine
@@ -440,22 +441,36 @@ class FirmAE(EmulationEngines):
                         
                         if item[1] != "Unknown":
                             if item[1] not in critical_binaries.keys():
-                                critical_binaries[target] = {"pids": set()}
-                            critical_binaries[target]["pids"].add(pid)
+                                critical_binaries[item[1]] = {"pids": set(),
+                                                             "owns": set(),
+                                                             "access": set(),
+                                                             "CVEs": []}
+                            critical_binaries[item[1]]["pids"].add(pid)
 
         print(critical_binaries)
+
         for pid in pid_to_binary.keys():
             print(f"PID: {pid} | {pid_to_binary[pid]}")
+        
+        self.reportStruct.port_activity.binary_report = critical_binaries
+
+        CveLookup.run_grype_on_directory(self.reportStruct)
+
         # Perform process profiling for all critical processes
-        for binary in critical_binaries.keys():
+        for binary in self.reportStruct.port_activity.binary_report.keys():
             # Find all ports that can me accessed by this binary
             ports = set()
-            for pid in critical_binaries[binary]["pids"]:
+            for pid in self.reportStruct.port_activity.binary_report[binary]["pids"]:
                 for port in self.reportStruct.port_activity.pid_to_ports[pid]["access"]:
                     ports.add(port)
-            binary_label = self.binary_profiling(binary, "", list(ports))
-            binary_label.print()
+            self.reportStruct.port_activity.binary_report[binary]["access"] = ports 
+            self.reportStruct.port_activity.binary_report[binary]["label"] = self.binary_profiling(binary, "", list(ports))
+            self.reportStruct.port_activity.binary_report[binary]["label"].print()
 
+        for binary in self.reportStruct.port_activity.binary_report.keys():
+           self.reportStruct.port_activity.binary_report[binary]["label"].print()
+           CveLookup.print_cve(self.reportStruct.port_activity.binary_report[binary]["CVEs"])
+        
         return
         
     def check(self):

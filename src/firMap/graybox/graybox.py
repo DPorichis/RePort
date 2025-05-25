@@ -54,6 +54,7 @@ def graybox(args):
 
     log.message("info", "Initial systemcall tracking started")
     output = engine.check()
+    
 
     # log.message("info", "Emulated port verification started")
     # engine.emulate()
