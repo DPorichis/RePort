@@ -18,7 +18,7 @@
     .header-logo {
       width: 48px;
       height: 48px;
-      background: #ccc;
+      background: #24478a;
       border-radius: 4px;
     }
     h1 {
@@ -41,7 +41,8 @@
       text-align: center;
     }
     .stats-box {
-      background-color: #ddd;
+      border: 1px solid #2e3591;
+      background-color: #0051ff2f;
       padding: 20px;
       border-radius: 10px;
       display: grid;
@@ -62,25 +63,124 @@
     }
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0 10px; /* horizontal = 0, vertical = 10px */
       margin-top: 10px;
       border-radius: 10px;
     }
     th, td {
-      border: 1px solid #aaa;
-      padding: 10px;
+      text-align: center;
+      border: 0px solid #aaa;
+      padding: 10px 30px;
       text-align: left;
     }
+    td {
+      padding: 20px 30px;
+    }
     th {
-      background-color: #ddd;
+      padding: 15px 30px;
+      margin-bottom: 10px;
+      background-color: #fff;
+      border-top: 1px solid #aaa;
+      border-bottom: 1px solid #aaa;
     }
     .section-title {
       font-size: 24px;
       font-weight: bold;
       margin-bottom: 5px;
     }
+    tr{
+      padding: 15px 40px;
+      margin-bottom: 5px;
+    }
+    .expandable-content {
+      display: none;
+      border-radius: 20px;
+      padding: 20px 20px;
+    }
+    .expandable-content td {
+      padding: 15px;
+      border-radius: 20px;
+      padding: 20px 20px;
+      padding-bottom: 30px;
+      border: 1px solid #aaa;
+    }
+    .clickable {
+      cursor: pointer;
+      background-color: #c7c8cc2f;
+    }
+    th.first{
+      border-left: 1px solid #aaa;
+      border-top-left-radius: 15px;
+      border-bottom-left-radius: 15px;
+    }
+    th.last{
+      border-top-right-radius: 15px;
+      border-right: 1px solid #aaa;
+      border-bottom-right-radius: 15px;
+    }
+    td.first{
+      border-top-left-radius: 15px;
+      border-bottom-left-radius: 15px;
+    }
+    td.last{
+      border-top-right-radius: 15px;
+      border-bottom-right-radius: 15px;
+    }
+
+    table.cont {
+      border: none;
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th.cont, td.cont {
+      border: none;
+      text-align: center;
+      padding: 10px 10px;
+      text-align: left;
+      border-bottom: 1px solid #aaa;
+    }
+    th.cont {
+      padding: 10px 10px;
+      margin-bottom: 10px;
+    }
+
+    .status-circle {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .status-circle.green {
+      background-color: green;
+    }
+
+    .status-circle.red {
+      background-color: red;
+    }
+
+    .status-circle.yellow {
+      background-color: goldenrod;
+    }
   </style>
 </head>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const rows = document.querySelectorAll('.clickable');
+
+    rows.forEach(row => {
+      row.addEventListener('click', () => {
+        const next = row.nextElementSibling;
+        if (next && next.classList.contains('expandable-content')) {
+          next.style.display = next.style.display === 'table-row' ? 'none' : 'table-row';
+        }
+      });
+    });
+  });
+</script>
 <body>
 
 <div class="header">
@@ -92,7 +192,7 @@
 </div>
 
 <div class="section">
-  <div class="section-title">RePort Stats</div>
+  <div class="section-title">RePort Details</div>
   <div class="stats-box">
     <div><label>Firmware Name:</label> <span>{{ firmware_name }}</span></div>
     <div><label>Mode:</label> <span>{{ mode }}</span></div>
@@ -109,21 +209,47 @@
   <div class="section-title">Port Activity Found</div>
   <table>
     <tr>
-      <th>Port</th>
-      <th>Type</th>
-      <th>Binded by</th>
-      <th>Timeframe</th>
-      <th>Verified</th>
-      <th>CVE Found</th>
+      <th class="first" style="width: 20%;">Port</th>
+      <th style="width: 20%; text-align: center;">Number of binds</th>
+      <th style="width: 20%; text-align: center;">Verified</th>
+      <th class="last" style="width: 20%;"></tr>
     </tr>
-    {% for port in port_activity %}
-    <tr>
-      <td>{{ port.port }}</td>
-      <td>{{ port.type }}</td>
-      <td>{{ port.binded_by }}</td>
-      <td>{{ port.timeframe }}</td>
-      <td>{{ port.verified }}</td>
-      <td>{{ port.cve_found }}</td>
+    {% for instance in port_activity %}
+    <tr class="clickable">
+      <td class="first">{{ instance.port }}</td>
+      <td style="text-align: center;">{{ instance.noi }}</td>
+      <td style="text-align: center;">
+        {% if instance.verified == "true" %}
+          <span class="status-circle green" title="Verified"></span>
+        {% elif instance.verified == "false" %}
+          <span class="status-circle red" title="Not Verified"></span>
+        {% else %}
+          <span class="status-circle yellow" title="Can't be verified"></span>
+        {% endif %}
+      </td>
+      <td class="last">Click for details</td>
+    </tr>
+    <tr class="expandable-content">
+      <td colspan="6">
+        <strong>Actions on port {{ instance.port }}:</strong><br>
+        
+        <table style="margin-top: 10px;" class="cont">
+            <tr class="cont">
+              <th class="cont">Binded By</th>
+              <th class="cont">Type</th>
+              <th class="cont">Timeframe</th>
+              <th class="cont">Processes with Access</th>
+            </tr>
+            {% for item in instance.activity %}
+            <tr class="cont">
+              <td class="cont">{{ item.binded_by }}</td>
+              <td class="cont">{{ item.type }}</td>
+              <td class="cont">{{ item.timeframe }}</td>
+              <td class="cont">{{ item.subproc }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+      </td>
     </tr>
     {% endfor %}
     <tr><td colspan="6">&nbsp;</td></tr>
@@ -131,23 +257,96 @@
 </div>
 
 <div class="section">
-  <div class="section-title">CVE Report</div>
+  <div class="section-title">Outward facing binaries found</div>
   <table>
     <tr>
-      <th>CVE</th>
-      <th>Binary</th>
-      <th>Rating</th>
-      <th>Ports Opened by that binary</th>
+      <th class="first">Binary</th>
+      <th style="text-align: center;">Ports binded</th>      
+      <th style="text-align: center;">Ports accessed</th>
+      <th style="text-align: center;">Instances spawned</th>
+      <th style="text-align: center;">CVEs Found</th>
+      <th class="last"></tr>
     </tr>
-    {% for cve in cve_report %}
-    <tr>
-      <td>{{ cve.cve_id }}</td>
-      <td>{{ cve.binary }}</td>
-      <td>{{ cve.rating }}</td>
-      <td>{{ cve.ports_opened }}</td>
+    {% for instance in proc_activity %}
+    <tr class="clickable">
+      <td class="first">{{ instance.binary }}</td>
+      <td style="text-align: center;">{{ instance.noo }}</td>
+      <td style="text-align: center;">{{ instance.noa }}</td>
+      <td style="text-align: center;">{{ instance.nop }}</td>
+      <td style="text-align: center;">{{ instance.noc }}</td>
+      <td class="last">Click for details</td>
+    </tr>
+    <tr class="expandable-content">
+      <td colspan="6">
+        <strong>Overview of {{ instance.binary }}</strong><br>
+        
+        <table style="margin-top: 10px;" class="cont">
+            <tr class="cont">
+              <th style="width: 20%;" class="cont"></th>
+              <th style="width: 80%;" class="cont"></th>
+            </tr>
+            <tr class="cont">
+              <td class="cont">Path</td>
+              <td class="cont">{{ instance.path }}</td>
+            </tr>
+            <tr class="cont">
+              <td class="cont">Owned Ports</td>
+              <td class="cont">{{ instance.owns }}</td>
+            </tr>
+            <tr class="cont">
+              <td class="cont">Accessible Ports</td>
+              <td class="cont">{{ instance.access }}</td>
+            </tr>
+            <tr class="cont">
+              <td class="cont">PIDs</td>
+              <td class="cont">{{ instance.pids }}</td>
+            </tr>
+            </table>
+      </td>
     </tr>
     {% endfor %}
-    <tr><td colspan="4">&nbsp;</td></tr>
+    <tr><td colspan="6">&nbsp;</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">CVEs Report</div>
+  <table>
+    <tr>
+      <th class="first">Binary</th>
+      <th style="text-align: center;">CVE Count</th>      
+      <th style="text-align: center;">Ports Reachable from that binary</th>
+      <th class="last"></tr>
+    </tr>
+    {% for instance in cve_report %}
+    <tr class="clickable">
+      <td class="first">{{ instance.binary }}</td>
+      <td style="text-align: center;">{{ instance.noc }}</td>
+      <td style="text-align: center;">{{ instance.noa }}</td>
+      <td class="last">Click for details</td>
+    </tr>
+    <tr class="expandable-content">
+      <td colspan="6">
+        <strong>Overview of {{ instance.binary }}</strong><br>
+        
+        <table style="margin-top: 10px;" class="cont">
+            <tr class="cont">
+              <th style="width: 20%;" class="cont">CVE ID</th>
+              <th style="width: 20%;" class="cont">Rating</th>
+              <th style="width: 60%;" class="cont">Description</th>
+            </tr>
+            {% for item in instance.cves %}
+            <tr class="cont">
+              <td class="cont"><a href="{{item.link}}" target="_blank">{{ item.id }}</a></td>
+              <td class="cont">{{ item.rating }}</td>
+              <td class="cont">{{ item.desc }}</td>
+            </tr>
+            {% endfor %}
+            </table>
+      </td>
+    </tr>
+    {% endfor %}
+    <tr><td colspan="6">&nbsp;</td></tr>
   </table>
 </div>
 

@@ -91,7 +91,7 @@ class PortActivity:
         else:
             # if self.open_ports[port]["owner"][1] != pid:    
                 old = self.open_ports[port]
-                log.message("warn", f"Port {port} overidden from an other process ({self.open_ports[port]["owner"][0]} -> {process_name})")
+                # log.message("warn", f"Port {port} overidden from an other process ({self.open_ports[port]["owner"][0]} -> {process_name})")
                 if port not in self.port_history.keys():
                     self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
@@ -115,7 +115,7 @@ class PortActivity:
             if fd in self.process_activity[pid].keys():
                 port = self.process_activity[pid][fd]["port"]
                 if port not in self.open_ports.keys():
-                    log.message("error", "Jim did something wrong", "Jim")
+                    # log.message("error", "Jim did something wrong", "Jim")
                     del self.process_activity[pid][fd]
                     return
                 self.open_ports[port]["access"].remove(pid)
@@ -134,7 +134,7 @@ class PortActivity:
                                                                 "access_history": old["access_history"]
                                                                 })
                     
-                    log.message("warn", f"{port} deleted due to closure of last", "Jim")
+                    # log.message("warn", f"{port} deleted due to closure of last", "Jim")
                     del self.open_ports[port]
                 del self.process_activity[pid][fd]
 
@@ -148,7 +148,7 @@ class PortActivity:
                 # Update the port that this PID no longer has access to this port
                 port = self.process_activity[pid][fd]["port"]
                 if port not in self.open_ports.keys():
-                    log.message("error", "Jim did something wrong", "Jim")
+                    # log.message("error", "Jim did something wrong", "Jim")
                     continue
                 if pid in self.open_ports[port]["access"]:
                     self.open_ports[port]["access"].remove(pid)
@@ -168,7 +168,7 @@ class PortActivity:
                                                                 "times": (old["start"], timestamp),
                                                                 "access_history": old["access_history"]
                                                                 })                    
-                    log.message("warn", f"{port} deleted", "Jim")
+                    # log.message("warn", f"{port} deleted", "Jim")
                     del self.open_ports[port]
                 
             # Delete this instance

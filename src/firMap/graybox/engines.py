@@ -390,7 +390,7 @@ class FirmAE(EmulationEngines):
 
                         argv_list = shlex.split(argv)
                         path_list = path.split(':')
-                        print(argv_list)
+                        # print(argv_list)
 
                         cmd = argv_list[0]
                         possible_locations = []
@@ -420,12 +420,12 @@ class FirmAE(EmulationEngines):
                         for target in possible_locations:
                             if os.path.isfile(target):
                                 item = (timestamp, target, argv)
-                                print(f"Found binary file at: {target}")
+                                # print(f"Found binary file at: {target}")
                                 break
                         
                         # If it doesn't exist just add it as unknown path
                         if item is None:
-                            log.message("warn", "No binary found")
+                            # log.message("warn", "No binary found")
                             item = (timestamp, "Unknown", argv)
                         
                         if pid not in pid_to_binary.keys():
@@ -447,10 +447,10 @@ class FirmAE(EmulationEngines):
                                                              "CVEs": []}
                             critical_binaries[item[1]]["pids"].add(pid)
 
-        print(critical_binaries)
+        # print(critical_binaries)
 
-        for pid in pid_to_binary.keys():
-            print(f"PID: {pid} | {pid_to_binary[pid]}")
+        # for pid in pid_to_binary.keys():
+        #     print(f"PID: {pid} | {pid_to_binary[pid]}")
         
         self.reportStruct.port_activity.binary_report = critical_binaries
 
@@ -460,10 +460,14 @@ class FirmAE(EmulationEngines):
         for binary in self.reportStruct.port_activity.binary_report.keys():
             # Find all ports that can me accessed by this binary
             ports = set()
+            owns = set()
             for pid in self.reportStruct.port_activity.binary_report[binary]["pids"]:
                 for port in self.reportStruct.port_activity.pid_to_ports[pid]["access"]:
                     ports.add(port)
+                for port in self.reportStruct.port_activity.pid_to_ports[pid]["owns"]:
+                    owns.add(port)
             self.reportStruct.port_activity.binary_report[binary]["access"] = ports 
+            self.reportStruct.port_activity.binary_report[binary]["owns"] = owns
             self.reportStruct.port_activity.binary_report[binary]["label"] = self.binary_profiling(binary, "", list(ports))
             self.reportStruct.port_activity.binary_report[binary]["label"].print()
 
