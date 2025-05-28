@@ -5,7 +5,6 @@ from jinja2 import Template
 import json
 import sys
 import os
-
 class Logger:
 
     def __init__ (self, monitor = 'FirMap Monitor', log_file=None, output_file=None):
@@ -51,6 +50,8 @@ class Logger:
                 item = {}
                 item["binded_by"] = f"{instance["owner"][0]} ({instance["owner"][1]})"
                 item["timeframe"] = f"{instance["times"][0]} - {instance["times"][1]}"
+                item["type"] = instance["type"]
+                item["family"] = instance["family"]
                 item["subproc"] = ""
                 for proc in instance["access_history"]:
                     item["subproc"] += f" {proc} "
@@ -63,8 +64,11 @@ class Logger:
                 port_report["verified"] = "true"    
             elif "END" not in activity_list[-1]["timeframe"]:
                 port_report["verified"] = "NA"
+            elif activity_list[-1]["type"] != "TCP":
+                port_report["verified"] = "Unsupported"
             else:
                 port_report["verified"] = "false"
+            port_report["lpu"] = activity_list[-1]["type"]
             port_report["activity"] = activity_list
             port_activity.append(port_report)
                 
@@ -129,14 +133,19 @@ class Logger:
             item["cves"] = activity_list
             cve_report.append(item)
 
+        if graybox.black_verification is None:
+            verification_engine = "Disabled"
+        else:
+            verification_engine = graybox.black_verification.name()
+
 
         # Example input data
         data = {
             "firmware_name": os.path.basename(graybox.firware_path),
             "mode": "Graybox Analysis",
             "md5_hash": graybox.md5_hash,
-            "blackbox_engine": "Nmap",
-            "result": "Success",
+            "blackbox_engine": verification_engine,
+            "result": graybox.result,
             "graybox_engine": engine.name(),
             "report_folder": os.path.basename(graybox.report_path),
             "cve_lookup": "Grype",

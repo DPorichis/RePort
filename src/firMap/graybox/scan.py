@@ -37,6 +37,8 @@ class GrayBoxScan:
         # Port Logs
         self.port_activity = PortActivity()
 
+        self.result = "Success"
+
     def io_md5(self, target):
         """
         Performs MD5 with a block size of 64kb.
@@ -78,7 +80,7 @@ class PortActivity:
         self.close_cache = []
         self.close_cache_users = 0
 
-    def new_bind(self, timestamp, pid, fd, port, process_name, family, type):
+    def new_bind(self, timestamp:float, pid:int, fd:int, port:int, process_name:str, family:str, type:str):
         if pid not in self.process_activity.keys():
             self.process_activity[pid] = {}
         
@@ -87,7 +89,7 @@ class PortActivity:
 
         if port not in self.open_ports.keys():
             self.ports_used.add(port)
-            self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp} 
+            self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type} 
         else:
             # if self.open_ports[port]["owner"][1] != pid:    
                 old = self.open_ports[port]
@@ -95,17 +97,19 @@ class PortActivity:
                 if port not in self.port_history.keys():
                     self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
-                                                            "access_history": old["access_history"]
+                                                            "access_history": old["access_history"],
+                                                            "family": old["family"], "type": old["type"]
                                                             }],
                                                 "verification": None
                                                 }
                 else:
                     self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
-                                                            "access_history": old["access_history"]
+                                                            "access_history": old["access_history"],
+                                                            "family": old["family"], "type": old["type"]
                                                             })
 
-                self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp}
+                self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type} 
     
     def update_port_info(self, pid, fd=-1, port=-1):
         return
@@ -124,14 +128,16 @@ class PortActivity:
                     if port not in self.port_history.keys():
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
-                                                                "access_history": old["access_history"]
+                                                                "access_history": old["access_history"],
+                                                                "family": old["family"], "type": old["type"]
                                                                 }],
                                                     "verification": None
                                                     }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
-                                                                "access_history": old["access_history"]
+                                                                "access_history": old["access_history"],
+                                                                "family": old["family"], "type": old["type"]
                                                                 })
                     
                     # log.message("warn", f"{port} deleted due to closure of last", "Jim")
@@ -159,14 +165,16 @@ class PortActivity:
                     if port not in self.port_history.keys():
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
-                                                                "access_history": old["access_history"]
+                                                                "access_history": old["access_history"],
+                                                                "family": old["family"], "type": old["type"]
                                                                 }],
                                                     "verification": None            
                                                     }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
-                                                                "access_history": old["access_history"]
+                                                                "access_history": old["access_history"],
+                                                                "family": old["family"], "type": old["type"]
                                                                 })                    
                     # log.message("warn", f"{port} deleted", "Jim")
                     del self.open_ports[port]
@@ -210,14 +218,16 @@ class PortActivity:
             if port not in self.port_history.keys():
                 self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                         "times": (old["start"], "END"),
-                                                        "access_history": old["access_history"]
+                                                        "access_history": old["access_history"],
+                                                        "family": old["family"], "type": old["type"]
                                                         }],
                                             "verification": None
                                             }
             else:
                 self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                         "times": (old["start"], "END"),
-                                                        "access_history": old["access_history"]
+                                                        "access_history": old["access_history"],
+                                                        "family": old["family"], "type": old["type"]
                                                         })
 
         for port in self.port_history.keys():

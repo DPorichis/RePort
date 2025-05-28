@@ -108,6 +108,7 @@ class EmulationEngines(ABC):
                     self.reportStruct.port_activity.port_history[port]["verification"] = blackbox.reportStruct.ports[port][0]
                 else:
                     log.message("warn", f"Port {port} was found open, but no logs of it where tracked", "Graybox Verification")
+        self.reportStruct.black_verification = blackbox
         return
 
     @abstractmethod
@@ -225,12 +226,16 @@ class FirmAE(EmulationEngines):
                     family = int(match.group(5))
                     port = int(match.group(6))
                     if(family == 2 or family == 10):
+                        if family == 2:
+                            family_string = "IPv4"
+                        else:
+                            family_string = "IPv6"
                         bind_cache[pid] = {"timestamp":timestamp, 
                                            "pid": pid,
                                            "fd": fd, 
                                            "port": port,
                                            "name": proc_name,
-                                           "family": family,
+                                           "family": family_string,
                                            "type": "unknown"
                                         }
 
@@ -245,7 +250,12 @@ class FirmAE(EmulationEngines):
                     port = int(match.group(5))
                     if pid in bind_cache.keys():
                         if bind_cache[pid]["port"] == port:
-                            bind_cache[pid]["type"] = proto
+                            if proto == "SOCK_DGRAM":
+                                bind_cache[pid]["type"] = "UDP"
+                            elif proto == "SOCK_STREAM":
+                                bind_cache[pid]["type"] = "TCP"
+                            else:
+                                bind_cache[pid]["type"] = "Other"
 
                 # Search for ipv6 bind to retrive port type
                 match = re.search(inet6_bind_pattern, line)
@@ -258,7 +268,12 @@ class FirmAE(EmulationEngines):
                     port = int(match.group(5))
                     if pid in bind_cache.keys():
                         if bind_cache[pid]["port"] == port:
-                            bind_cache[pid]["type"] = proto
+                            if proto == "SOCK_DGRAM":
+                                bind_cache[pid]["type"] = "UDP"
+                            elif proto == "SOCK_STREAM":
+                                bind_cache[pid]["type"] = "TCP"
+                            else:
+                                bind_cache[pid]["type"] = "Other"
 
                 # Search for bind return code to ensure success 
                 match = re.search(bind_ret_pattern, line)
@@ -324,6 +339,7 @@ class FirmAE(EmulationEngines):
                 print(f"|-[Instance]")
                 print(f"| |- Owner: {instance["owner"][0]}({instance["owner"][1]})]")
                 print(f"| |- Access: {instance["access_history"]}]")
+                print(f"| |- Family: {instance["family"]} - Type: {instance["type"]}]")
                 print(f"| |- Timestamps: {instance["times"][0]} - {instance["times"][1]}]")
                     
         # Decompress the file system for analysis
@@ -456,6 +472,8 @@ class FirmAE(EmulationEngines):
 
         CveLookup.run_grype_on_directory(self.reportStruct)
 
+        shutil.copy(input_file, os.path.join(self.reportStruct.report_path, "systemcalls.log"))
+
         # Perform process profiling for all critical processes
         for binary in self.reportStruct.port_activity.binary_report.keys():
             # Find all ports that can me accessed by this binary
@@ -496,6 +514,7 @@ class FirmAE(EmulationEngines):
                     self.reportStruct.logs = self.PATH_TO_FIRMAE + "scratch/" + str(image_id) + "/"
                 else:
                     log.message("error", "FirmAE failed miserably.", "FirmAE")
+                    self.reportStruct.result = "Failed"
             db.close()
 
         self.analysis()
@@ -511,6 +530,7 @@ class FirmAE(EmulationEngines):
                     break
                 if "RTNETLINK answers: File exists" in line:
                     log.message("warn", f"Tap Device setup failed, (tap1_0 already exists)", "FirmAE -run")
+                    self.result = "Failed"
                     break
 
         command = ["sudo", "-E", "./run.sh", "--run", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
@@ -536,12 +556,14 @@ class FirmAE(EmulationEngines):
 
         if reader_thread.is_alive():
             log.message("warn", f"Emulation Timeout reached ({timeout_seconds} s). Firmware emulation exiting...")
+            self.reportStruct.result = "Failed"
             process.terminate()
             reader_thread.join()
 
         if result['running']:
             log.message("info", f"Firmware emulation open at IP {self.reportStruct.ip_address}.", "FirmAE -run")
         else:
+            self.reportStruct.result = "Failed"
             log.message("error", f"Firmware emulation failed.", "FirmAE -run")
 
         self.emulationProc = process

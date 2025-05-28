@@ -21,6 +21,10 @@
       background: #24478a;
       border-radius: 4px;
     }
+    .header-logo.failed {
+      background: #992121;
+      border-radius: 4px;
+    }
     h1 {
       margin: 0;
       font-size: 32px;
@@ -49,6 +53,10 @@
       grid-template-columns: 1fr 1fr;
       gap: 10px 30px;
       margin-top: 10px;
+    }
+    .stats-box.failed {
+      border: 1px solid #912e2e;
+      background-color: #ff00005e;
     }
     .stats-box label {
       font-weight: normal;
@@ -164,6 +172,10 @@
     .status-circle.yellow {
       background-color: goldenrod;
     }
+
+    .status-circle.yellow {
+      background-color: rgb(0, 0, 0);
+    }
   </style>
 </head>
 
@@ -185,7 +197,11 @@
 
 <div class="header">
   <div class="header">
+  {% if result == "Success" %}
   <div class="header-logo"></div>
+  {% else %}
+  <div class="header-logo failed"></div>
+  {% endif %}
   <h1>RePort</h1>
   </div>
   <div class="subtitle">Attack Surface Mapping</div>
@@ -193,7 +209,8 @@
 
 <div class="section">
   <div class="section-title">RePort Details</div>
-  <div class="stats-box">
+  {% if result == "Success" %}
+  <div class="stats-box" >
     <div><label>Firmware Name:</label> <span>{{ firmware_name }}</span></div>
     <div><label>Mode:</label> <span>{{ mode }}</span></div>
     <div><label>MD5 Hash:</label> <span>{{ md5_hash }}</span></div>
@@ -203,6 +220,18 @@
     <div><label>RePort Folder:</label> <span>{{ report_folder }}</span></div>
     <div><label>CVE Lookup:</label> <span>{{ cve_lookup }}</span></div>
   </div>
+  {% else %}
+  <div class="stats-box failed" >
+    <div><label>Firmware Name:</label> <span>{{ firmware_name }}</span></div>
+    <div><label>Mode:</label> <span>{{ mode }}</span></div>
+    <div><label>MD5 Hash:</label> <span>{{ md5_hash }}</span></div>
+    <div><label>Blackbox Engine:</label> <span>{{ blackbox_engine }}</span></div>
+    <div><label>Result:</label> <span>{{ result }}</span></div>
+    <div><label>Graybox Engine:</label> <span>{{ graybox_engine }}</span></div>
+    <div><label>RePort Folder:</label> <span>{{ report_folder }}</span></div>
+    <div><label>CVE Lookup:</label> <span>{{ cve_lookup }}</span></div>
+  </div>
+  {% endif %}
 </div>
 
 <div class="section">
@@ -211,6 +240,7 @@
     <tr>
       <th class="first" style="width: 20%;">Port</th>
       <th style="width: 20%; text-align: center;">Number of binds</th>
+      <th style="width: 20%; text-align: center;">Last Protocol Used</th>
       <th style="width: 20%; text-align: center;">Verified</th>
       <th class="last" style="width: 20%;"></tr>
     </tr>
@@ -218,13 +248,16 @@
     <tr class="clickable">
       <td class="first">{{ instance.port }}</td>
       <td style="text-align: center;">{{ instance.noi }}</td>
+      <td style="text-align: center;">{{ instance.lpu }}</td>
       <td style="text-align: center;">
         {% if instance.verified == "true" %}
           <span class="status-circle green" title="Verified"></span>
         {% elif instance.verified == "false" %}
           <span class="status-circle red" title="Not Verified"></span>
+        {% elif instance.verified == "NA" %}
+          <span class="status-circle yellow" title="Port closed before verification"></span>
         {% else %}
-          <span class="status-circle yellow" title="Can't be verified"></span>
+          <span class="status-circle gray" title="Can't be verified"></span>
         {% endif %}
       </td>
       <td class="last">Click for details</td>
@@ -236,13 +269,15 @@
         <table style="margin-top: 10px;" class="cont">
             <tr class="cont">
               <th class="cont">Binded By</th>
-              <th class="cont">Type</th>
+              <th class="cont">Family</th>
+              <th class="cont">Protocol</th>
               <th class="cont">Timeframe</th>
               <th class="cont">Processes with Access</th>
             </tr>
             {% for item in instance.activity %}
             <tr class="cont">
               <td class="cont">{{ item.binded_by }}</td>
+              <td class="cont">{{ item.family }}</td>
               <td class="cont">{{ item.type }}</td>
               <td class="cont">{{ item.timeframe }}</td>
               <td class="cont">{{ item.subproc }}</td>
