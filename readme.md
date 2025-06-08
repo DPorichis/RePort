@@ -1,11 +1,9 @@
 # RePort - An automatic attack surface mapper
-RePort is an automated attack surface mapping tool designed to identify and analyze port operations within IoT firmware. It leverages firmware emulation engines to trace system calls and generate insightful reports on critical processes, open ports, and known vulnerabilities.
+**RePort** is an automated attack surface mapping tool designed to identify and analyze port operations within IoT firmware. It leverages firmware emulation engines to trace system calls and generate insightful reports on critical processes, open ports, and known vulnerabilities.
 
-This project was developed as part of a BSc thesis at the Department of Informatics and Telecommunications, National and Kapodistrian University of Athens.
+*This project was developed as part of D. Porichis' BSc thesis at the Department of Informatics and Telecommunications, National and Kapodistrian University of Athens.*
 
 ## Implementation Graph
-`This will get more detailed, trust me`
-
 ```mermaid
 graph LR
     IP((IP)):::equalCircleStyle --> Port[Port Discovery] --> Fing[Service Finger-printing] --> D[Visualization]
