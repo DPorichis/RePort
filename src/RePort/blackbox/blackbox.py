@@ -1,6 +1,6 @@
-from firMap.blackbox.engines import *
-from firMap.blackbox.scan import *
-from firMap.utils import Logger
+from RePort.blackbox.engines import *
+from RePort.blackbox.scan import *
+from RePort.utils import Logger
 import sys
 import subprocess
 

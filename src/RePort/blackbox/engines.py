@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
-from firMap.blackbox.scan import *
-from firMap.utils import Logger
+from RePort.blackbox.scan import *
+from RePort.utils import Logger
 
 log = Logger("Blackbox Monitor")
 

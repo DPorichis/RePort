@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
-from firMap.graybox.lookup import CveLookup
-from firMap.graybox.scan import *
+from RePort.graybox.lookup import CveLookup
+from RePort.graybox.scan import *
 from ..utils import Logger
-from firMap.blackbox.engines import NmapEngine
+from RePort.blackbox.engines import NmapEngine
 import subprocess
 import psycopg2
 import tarfile

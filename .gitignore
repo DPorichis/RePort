@@ -4,3 +4,4 @@ venv/
 FirmaINC/
 env/
 **/cache/
+**/reports/

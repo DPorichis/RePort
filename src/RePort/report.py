@@ -1,9 +1,9 @@
 import argparse
-from firMap.blackbox.blackbox import blackbox
-from firMap.graybox.graybox import graybox
+from RePort.blackbox.blackbox import blackbox
+from RePort.graybox.graybox import graybox
 
 def main():
-    parser = argparse.ArgumentParser(description="FirMap ~ Automatically Mapping the Attack Surface of System")
+    parser = argparse.ArgumentParser(description="RePort ~ Automatically Mapping the Attack Surface of System")
     
     scan_type_group = parser.add_mutually_exclusive_group()
     scan_type_group.add_argument('-black', action='store_true', help="Run Blackbox scan")

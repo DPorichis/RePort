@@ -1,5 +1,5 @@
-# from firMap.graybox.scan import GrayBoxScan
-# from firMap.graybox.engines import EmulationEngines
+# from RePort.graybox.scan import GrayBoxScan
+# from RePort.graybox.engines import EmulationEngines
 
 from jinja2 import Template
 import json
@@ -7,7 +7,7 @@ import sys
 import os
 class Logger:
 
-    def __init__ (self, monitor = 'FirMap Monitor', log_file=None, output_file=None):
+    def __init__ (self, monitor = 'RePort Monitor', log_file=None, output_file=None):
         self.monitor = monitor
         self.file = None
         self.log_file = log_file

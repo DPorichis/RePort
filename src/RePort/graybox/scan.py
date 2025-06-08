@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import hashlib
-from firMap.utils import Logger
+from RePort.utils import Logger
 from datetime import datetime
 
 log = Logger("Graybox Monitor")
@@ -86,14 +86,14 @@ class PortActivity:
         
         self.process_activity[pid][fd] = {'port': port, 'timestamp': timestamp, 'family': family, 'type': type}
         self.critical_processes.add(int(pid))
-
+        port_tag = (family, type)
+        
         if port not in self.open_ports.keys():
-            self.ports_used.add(port)
-            self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type} 
+            self.ports_used.add(port)    
+            self.open_ports[port] = {port_tag: {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type}} 
         else:
-            # if self.open_ports[port]["owner"][1] != pid:    
-                old = self.open_ports[port]
-                # log.message("warn", f"Port {port} overidden from an other process ({self.open_ports[port]["owner"][0]} -> {process_name})")
+            if port_tag in self.open_ports[port].keys():
+                old = self.open_ports[port][port_tag]
                 if port not in self.port_history.keys():
                     self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                             "times": (old["start"], timestamp),
@@ -109,7 +109,7 @@ class PortActivity:
                                                             "family": old["family"], "type": old["type"]
                                                             })
 
-                self.open_ports[port] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type} 
+            self.open_ports[port][port_tag] = {'owner': (process_name, pid), "access": {pid}, "access_history": {pid}, "start": timestamp, "family": family, "type": type}
     
     def update_port_info(self, pid, fd=-1, port=-1):
         return
@@ -118,13 +118,14 @@ class PortActivity:
         if pid in self.process_activity.keys():
             if fd in self.process_activity[pid].keys():
                 port = self.process_activity[pid][fd]["port"]
-                if port not in self.open_ports.keys():
-                    # log.message("error", "Jim did something wrong", "Jim")
+                port_tag = (self.process_activity[pid][fd]["family"], self.process_activity[pid][fd]["type"])
+                if port not in self.open_ports.keys() or port_tag not in self.open_ports[port].keys():
+                    log.message("error", "Jim did something wrong", "Jim")
                     del self.process_activity[pid][fd]
                     return
-                self.open_ports[port]["access"].remove(pid)
-                if len(self.open_ports[port]["access"]) == 0:
-                    old = self.open_ports[port]
+                self.open_ports[port][port_tag]["access"].remove(pid)
+                if len(self.open_ports[port][port_tag]["access"]) == 0:
+                    old = self.open_ports[port][port_tag]
                     if port not in self.port_history.keys():
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
@@ -141,7 +142,7 @@ class PortActivity:
                                                                 })
                     
                     # log.message("warn", f"{port} deleted due to closure of last", "Jim")
-                    del self.open_ports[port]
+                    del self.open_ports[port][port_tag]
                 del self.process_activity[pid][fd]
 
         # If we are waiting for PID info of a fork, cache this close
@@ -153,31 +154,31 @@ class PortActivity:
             for fd in self.process_activity[pid].keys():
                 # Update the port that this PID no longer has access to this port
                 port = self.process_activity[pid][fd]["port"]
-                if port not in self.open_ports.keys():
-                    # log.message("error", "Jim did something wrong", "Jim")
+                port_tag = (self.process_activity[pid][fd]["family"], self.process_activity[pid][fd]["type"])
+                if port not in self.open_ports.keys() or port_tag not in self.open_ports[port].keys():
+                    log.message("error", "Jim did something wrong on exit", "Jim")
                     continue
-                if pid in self.open_ports[port]["access"]:
-                    self.open_ports[port]["access"].remove(pid)
+                if pid in self.open_ports[port][port_tag]["access"]:
+                    self.open_ports[port][port_tag]["access"].remove(pid)
 
-                # Check if all accessors of the port have closed their fd
-                if len(self.open_ports[port]["access"]) == 0:
-                    old = self.open_ports[port]
+                if len(self.open_ports[port][port_tag]["access"]) == 0:
+                    old = self.open_ports[port][port_tag]
                     if port not in self.port_history.keys():
                         self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
                                                                 "access_history": old["access_history"],
                                                                 "family": old["family"], "type": old["type"]
                                                                 }],
-                                                    "verification": None            
+                                                    "verification": None
                                                     }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
                                                                 "times": (old["start"], timestamp),
                                                                 "access_history": old["access_history"],
                                                                 "family": old["family"], "type": old["type"]
-                                                                })                    
-                    # log.message("warn", f"{port} deleted", "Jim")
-                    del self.open_ports[port]
+                                                                })
+                    # log.message("warn", f"{port} deleted due to closure of last", "Jim")
+                    del self.open_ports[port][port_tag]
                 
             # Delete this instance
             del self.process_activity[pid]
@@ -205,8 +206,9 @@ class PortActivity:
 
         for fd in self.process_activity[child_pid].keys():
             port = self.process_activity[child_pid][fd]["port"]
-            self.open_ports[port]["access"].add(child_pid)
-            self.open_ports[port]["access_history"].add(child_pid)
+            port_tag = (self.process_activity[pid][fd]["family"], self.process_activity[pid][fd]["type"])
+            self.open_ports[port][port_tag]["access"].add(child_pid)
+            self.open_ports[port][port_tag]["access_history"].add(child_pid)
         
         self.close_cache_users -= 1
         if self.close_cache_users == 0:
@@ -214,30 +216,32 @@ class PortActivity:
 
     def end(self):
         for port in self.open_ports.keys():
-            old = self.open_ports[port]
-            if port not in self.port_history.keys():
-                self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
-                                                        "times": (old["start"], "END"),
-                                                        "access_history": old["access_history"],
-                                                        "family": old["family"], "type": old["type"]
-                                                        }],
-                                            "verification": None
-                                            }
-            else:
-                self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
-                                                        "times": (old["start"], "END"),
-                                                        "access_history": old["access_history"],
-                                                        "family": old["family"], "type": old["type"]
-                                                        })
+            for port_tag in self.open_ports[port].keys():
+                old = self.open_ports[port][port_tag]
+                if port not in self.port_history.keys():
+                    self.port_history[port] = {"instances": [{"owner": (old["owner"][0], old["owner"][1]),
+                                                            "times": (old["start"], "END"),
+                                                            "access_history": old["access_history"],
+                                                            "family": old["family"], "type": old["type"]
+                                                            }],
+                                                "verification": None
+                                                }
+                else:
+                    self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
+                                                            "times": (old["start"], "END"),
+                                                            "access_history": old["access_history"],
+                                                            "family": old["family"], "type": old["type"]
+                                                            })
 
         for port in self.port_history.keys():
             for instance in self.port_history[port]["instances"]:
                 for pid in instance["access_history"]:
+                    port_label = (port, instance["family"], instance["type"])
                     if pid not in self.pid_to_ports.keys():
                         self.pid_to_ports[pid] = {"access": set(),
                                             "owns": set()}
-                    self.pid_to_ports[pid]["access"].add(port)
-                self.pid_to_ports[instance["owner"][1]]["owns"].add(port)
+                    self.pid_to_ports[pid]["access"].add(port_label)
+                self.pid_to_ports[instance["owner"][1]]["owns"].add(port_label)
 
 class CriticalBinary:
     def compute_sha256(self):
