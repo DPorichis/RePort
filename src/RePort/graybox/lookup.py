@@ -1,5 +1,5 @@
-from firMap.graybox.engines import *
-from firMap.graybox.scan import *
+from RePort.graybox.engines import *
+from RePort.graybox.scan import *
 import json
 
 PATH_TO_GRYPE = os.path.abspath(

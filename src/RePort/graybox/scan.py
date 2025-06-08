@@ -3,7 +3,7 @@ import re
 import sys
 import subprocess
 import hashlib
-from firMap.utils import Logger
+from RePort.utils import Logger
 from datetime import datetime
 
 log = Logger("Graybox Monitor")

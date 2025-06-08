@@ -1,5 +1,5 @@
-from firMap.graybox.engines import *
-from firMap.graybox.scan import *
+from RePort.graybox.engines import *
+from RePort.graybox.scan import *
 from ..utils import Logger
 import sys
 import subprocess
