@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import subprocess
 import sys
+import shutil
 import xml.etree.ElementTree as ET
 from RePort.blackbox.scan import *
 from RePort.utils import Logger
@@ -18,6 +19,14 @@ class MappingEngine(ABC):
     def __init__(self, reportStruct=None, ip=''):
         if(reportStruct == None):
             self.reportStruct = BlackBoxScan(ip)
+
+    @abstractmethod
+    def install(self):
+        """
+        installation process for the given engine
+        """
+        pass
+
 
     @abstractmethod
     def name(self):
@@ -62,12 +71,48 @@ def get_engine_by_name(name):
             return engine
     return None
 
+def install_all_engines():
+    log.message("info","Installing all mapping engines present", "Blackbox Installer")
+    for engine_cls in MappingEngine.__subclasses__():
+        engine = engine_cls()
+        engine.install()
+
 
 # Nmap
 
 class NmapEngine(MappingEngine):
 
     flag_mapping = {"advanced": "-sV", "default": ""}
+
+    def install(self):
+        """
+        Install Nmap if not already installed.
+        """
+        try:
+            subprocess.run(['nmap', '--version'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log.message("info", "Nmap is already installed.", "Nmap")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+
+            pkg_managers = {
+                'apt-get': ['sudo', 'apt-get', 'install', '-y', 'nmap'],
+                'dnf': ['sudo', 'dnf', 'install', '-y', 'nmap'],
+                'yum': ['sudo', 'yum', 'install', '-y', 'nmap'],
+                'pacman': ['sudo', 'pacman', '-Sy', '--noconfirm', 'nmap'],
+                'apk': ['sudo', 'apk', 'add', 'nmap']
+            }
+
+            for pm, cmd in pkg_managers.items():
+                if shutil.which(pm):
+                    try:
+                        subprocess.run(cmd, check=True)
+                        log.message("info", f"Nmap installed successfully using {pm}.", "Nmap")
+                        return
+                    except subprocess.CalledProcessError as e:
+                        log.message("error", f"Failed to install Nmap with {pm}: {e}", "Nmap")
+                        return
+
+            log.message("error", "No supported package manager found. Install Nmap manually.", "Nmap")
+
 
     def name(self):
         return "nmap"

@@ -1,6 +1,6 @@
 import argparse
-from RePort.blackbox.blackbox import blackbox
-from RePort.graybox.graybox import graybox
+from RePort.blackbox.blackbox import blackbox, blackbox_install
+from RePort.graybox.graybox import graybox, graybox_install
 
 def main():
     parser = argparse.ArgumentParser(description="RePort ~ Automatically Mapping the Attack Surface of System")
@@ -13,6 +13,8 @@ def main():
     input_group.add_argument('-ip', type=str, help="Target IP to be scanned")
     input_group.add_argument('-firmware', type=str, help="Path to the firmware to be scanned")
 
+    parser.add_argument('-install', action='store_true', help="Installs all utilities needed for RePort")
+
     parser.add_argument('-le', action='store_true', help="Lists all engines available for the specified scan type")
     parser.add_argument('-cleanup', action='store_true', help="Removes all logs created by the specified engine, reseting functionality")
     parser.add_argument('-network-fix', action='store_true', help="Resets network that may have been left hanging")
@@ -22,6 +24,12 @@ def main():
 
     args = parser.parse_args()
 
+    if args.install:
+        # Install all dependencies needed for the engines
+        blackbox_install()
+        graybox_install()
+        print("what?")
+        return
     if args.black or not args.gray:
         blackbox(args)
     else:

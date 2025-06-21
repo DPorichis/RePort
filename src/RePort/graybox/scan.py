@@ -31,7 +31,10 @@ class GrayBoxScan:
         self.ip_address = ip_address
     
         # Firmware ID
-        self.md5_hash = self.io_md5(self.firware_path)
+        if self.firware_path != '':
+            self.md5_hash = self.io_md5(self.firware_path)
+        else:
+            self.md_hash = "NoFile"
         self.brand = brand
 
         # Port Logs

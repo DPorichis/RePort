@@ -9,6 +9,25 @@ PATH_TO_GRYPE = os.path.abspath(
 log = Logger("Graybox Monitor")
 
 class CveLookup:
+
+    def install():
+        """
+        Install the grype engine if not already installed.
+        """
+        if not os.path.exists(PATH_TO_GRYPE):
+            command = [
+                "sh", "-c",
+                "curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b "+ os.path.dirname(PATH_TO_GRYPE)
+            ]
+            try:
+                subprocess.run(command, check=True)
+                log.message("info", "Grype installation completed.", "Grype")
+            except subprocess.CalledProcessError as e:
+                print(f"Installation failed: {e}")
+        else:
+            log.message("info", "Grype engine is already installed.", "Grype")
+        return
+
     # Enrich the given report struct with the CVEs found
     def run_grype_on_directory(grayboxscan:GrayBoxScan):
 

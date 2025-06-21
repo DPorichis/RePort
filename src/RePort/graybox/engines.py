@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
-from RePort.graybox.lookup import CveLookup
+# from RePort.graybox.lookup import CveLookup
 from RePort.graybox.scan import *
 from ..utils import Logger
 from RePort.blackbox.engines import NmapEngine
+from RePort.graybox.lookup import CveLookup
 import subprocess
 import psycopg2
 import tarfile
@@ -19,6 +20,9 @@ import re
 
 log = Logger("Graybox Monitor")
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ENGINES_FOLDER = os.path.join(PROJECT_ROOT, "engines")
+
 class EmulationEngines(ABC):
     """
     Base class for emulation engines (like FirmUp, FirmINC or custom tools).
@@ -30,6 +34,13 @@ class EmulationEngines(ABC):
         if(reportStruct == None):
             self.reportStruct = GrayBoxScan(firmware=firmware, ip_address='')
             self.emulationProc = None
+
+    @abstractmethod
+    def install(self):
+        """
+        installation process for the given engine
+        """
+        pass
 
     @abstractmethod
     def name(self):
@@ -132,13 +143,20 @@ def get_engine_by_name(name, firmware=''):
             return engine
     return None
 
+def install_all_engines():
+    log.message("info","Installing all emulation engines present", "Graybox Installer")
+    for engine_cls in EmulationEngines.__subclasses__():
+        engine = engine_cls()
+        engine.install()
+    CveLookup.install()  # Ensure CVE lookup engine is also installed
 
 # FirmAE
 
 class FirmAE(EmulationEngines):
 
     # PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
-    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
+    # PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
+    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmAE/"
     flag_mapping = {"advanced": "-sV", "default": " "}
 
     DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
@@ -152,6 +170,34 @@ class FirmAE(EmulationEngines):
         if(reportStruct == None):
             self.reportStruct = GrayBoxScan(firmware=firmware, ip_address=ip)
             self.emulationProc = None
+
+
+    def install(self):
+
+        # Configuration
+        REPO_URL = "https://github.com/George-RG/FirmaInc.git"
+        TAG = "v0.0.1"
+        CLONE_DIR = os.path.join(ENGINES_FOLDER, "FirmAE")
+
+        def run_command(command, cwd=None):
+            try:
+                subprocess.run(command, cwd=cwd, shell=True, check=True)
+            except subprocess.CalledProcessError as e:
+                log.message("error", f"Command failed: {e}", "FEMU")                
+                sys.exit(1)
+
+        if os.path.isdir(CLONE_DIR):
+            log.message("info", f"Repository already exists at {CLONE_DIR}.", "FEMU")
+            return
+        else:
+            os.makedirs(os.path.dirname(CLONE_DIR), exist_ok=True)
+            run_command(f"git clone {REPO_URL} {CLONE_DIR}")
+
+        run_command("chmod +x install_apt.sh && ./install_apt.sh", cwd=CLONE_DIR)
+        run_command("chmod +x install.sh && ./install.sh", cwd=CLONE_DIR)
+        run_command("chmod +x download.sh && ./download.sh", cwd=CLONE_DIR)
+        
+        log.message("info", "Installation Completed", "FEMU") 
 
     def name(self):
         return "FirmAE"
@@ -665,4 +711,6 @@ if __name__ == "__main__":
     # firmware_path = "/home/dimitris/Documents/thesis/FirmAE/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
     firmware_path = "/home/porichis/dit-thesis/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
     engine = FirmAE(firmware=firmware_path)
-    engine.check()
+    
+    engine.install()
+    # engine.check()

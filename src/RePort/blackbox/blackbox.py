@@ -46,3 +46,8 @@ def blackbox(args):
 def blackbox_help():
     log.output("Jim didn't write the help page :(")
     return
+
+
+def blackbox_install():
+    install_all_engines()
+    return

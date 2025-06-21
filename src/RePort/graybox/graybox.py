@@ -70,3 +70,8 @@ def graybox(args):
 def blackbox_help():
     log.output("Jim didn't write the help page :(")
     return
+
+
+def graybox_install():
+    install_all_engines()
+    return
