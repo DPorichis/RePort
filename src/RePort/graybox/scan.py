@@ -264,7 +264,25 @@ class CriticalBinary:
     # TODO: Check the SHA against DBs
     def version_lookup(self):
         return "unknown"
-    
+
+    def dynamic_linked_libraries(self):
+        command = ["ldd", self.path]
+        artifacts = []
+        
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            for line in result.stdout.splitlines():
+                if "=>" in line:
+                    parts = line.split("=>")
+                    if len(parts) == 2:
+                        lib_name = parts[0].strip()
+                        lib_path = parts[1].strip().split()[0]
+                        artifacts.append({"library": lib_name, "path": lib_path})
+        except subprocess.CalledProcessError as e:
+            return []
+        
+        return artifacts
+
     # TODO: Perform Strings search inside the binary to extract version    
     def version_extraction(self):
         command = ["strings", self.path]
@@ -314,9 +332,11 @@ class CriticalBinary:
         self.sha = self.compute_sha256()
         self.version_extracted = []
         self.version_found = "unknown"
+        self.libraries = []
         if self.path != "":
             self.version_extracted = self.version_extraction()
             self.version_found = self.version_lookup()
+            self.libraries = self.dynamic_linked_libraries()
         self.ports = ports
         return
     
@@ -327,7 +347,8 @@ class CriticalBinary:
         label += f"- Cert: {self.cert}\n"
         label += f"- SHA256: {self.sha}\n"
         label += f"- Possible versions: {self.version_found}\n"
-        label += f"- Ports opened: {self.ports}"
+        label += f"- Ports opened: {self.ports}\n"
+        label += f"- Libraries: {self.libraries}\n"
         log.output(label)
 
     def owner_print(self, identation="| |"):

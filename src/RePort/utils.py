@@ -106,6 +106,12 @@ class Logger:
                 for port in graybox.port_activity.binary_report[binary]["pids"]:
                     item["pids"] += f" {port} "
 
+            if len(graybox.port_activity.binary_report[binary]["label"].libraries) == 0:
+                item["libraries"] = "No Dynamically Linked Libraries"
+            else:
+                item["libraries"] = ""
+                for lib in graybox.port_activity.binary_report[binary]["label"].libraries:
+                    item["libraries"] += f" {lib} "
             proc_activity.append(item)
         
         cve_report = []

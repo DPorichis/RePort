@@ -173,8 +173,8 @@
       background-color: goldenrod;
     }
 
-    .status-circle.yellow {
-      background-color: rgb(0, 0, 0);
+    .status-circle.black {
+      background-color: rgb(34, 34, 34);
     }
   </style>
 </head>
@@ -255,9 +255,9 @@
         {% elif instance.verified == "false" %}
           <span class="status-circle red" title="Not Verified"></span>
         {% elif instance.verified == "NA" %}
-          <span class="status-circle yellow" title="Port closed before verification"></span>
+          <span class="status-circle black" title="Port closed before verification"></span>
         {% else %}
-          <span class="status-circle gray" title="Can't be verified"></span>
+          <span class="status-circle yellow" title="Can't be verified"></span>
         {% endif %}
       </td>
       <td class="last">Click for details</td>
@@ -335,6 +335,10 @@
             <tr class="cont">
               <td class="cont">PIDs</td>
               <td class="cont">{{ instance.pids }}</td>
+            </tr>
+            <tr class="cont">
+              <td class="cont">Libraries</td>
+              <td class="cont">{{ instance.libraries }}</td>
             </tr>
             </table>
       </td>
