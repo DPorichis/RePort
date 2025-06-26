@@ -232,7 +232,7 @@ class FirmAE(EmulationEngines):
         
         # Pattern for retriving bind return values:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Return Code
-        bind_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+sys_bind_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*(\d+)"
+        bind_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+sys_bind_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*(\d+) \[Assigned Port: (\d+)\]"
         
         # Patterns for retriving ipv4 and ipv6 bind calls:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Proto | 5 - Port
@@ -328,9 +328,12 @@ class FirmAE(EmulationEngines):
                     pid = int(match.group(2))
                     proc_name = match.group(3)
                     ret_code = int(match.group(4))
+                    port_assigned = int(match.group(5))
                     if pid in bind_cache.keys():
                         if ret_code == 0:
                             info = bind_cache[pid]
+                            if info["port"] == 0 and port_assigned != 0:
+                                info["port"] = port_assigned
                             self.reportStruct.port_activity.new_bind(
                                 info["timestamp"], 
                                 info["pid"], 
