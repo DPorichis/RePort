@@ -46,17 +46,27 @@ class Logger:
 
         for port in graybox.port_activity.port_history.keys():
             activity_list = []
+            random_flag = False
             for instance in graybox.port_activity.port_history[port]["instances"]:
                 item = {}
                 item["binded_by"] = f"{instance["owner"][0]} ({instance["owner"][1]})"
                 item["timeframe"] = f"{instance["times"][0]} - {instance["times"][1]}"
                 item["type"] = instance["type"]
                 item["family"] = instance["family"]
+                if instance["random"] == True:
+                    item["random"] = "random"
+                else:   
+                    item["random"] = "false"
+                random_flag = instance["random"] or random_flag
                 item["subproc"] = ""
                 for proc in instance["access_history"]:
                     item["subproc"] += f" {proc} "
                 activity_list.append(item)
             port_report = {}
+            if random_flag == True:
+                port_report["random"] = "random"
+            else:   
+                port_report["random"] = "false"
             port_report["port"] = port
             port_report["noi"] = len(activity_list)
             if "verification" in graybox.port_activity.port_history[port].keys() and graybox.port_activity.port_history[port]["verification"] is not None:

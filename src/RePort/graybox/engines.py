@@ -332,8 +332,10 @@ class FirmAE(EmulationEngines):
                     if pid in bind_cache.keys():
                         if ret_code == 0:
                             info = bind_cache[pid]
+                            random = False
                             if info["port"] == 0 and port_assigned != 0:
                                 info["port"] = port_assigned
+                                random = True
                             self.reportStruct.port_activity.new_bind(
                                 info["timestamp"], 
                                 info["pid"], 
@@ -341,7 +343,9 @@ class FirmAE(EmulationEngines):
                                 info["port"], 
                                 info["name"], 
                                 info["family"], 
-                                info["type"]
+                                info["type"],
+                                random
+                                
                             )
                         del bind_cache[pid]
                     
@@ -385,7 +389,10 @@ class FirmAE(EmulationEngines):
             item = self.reportStruct.port_activity.port_history[port]
             print(f"[Port {port}]")
             for instance in item["instances"]:
-                print(f"|-[Instance]")
+                if (instance["random"] == True):
+                    print(f"|-[Instance] (Randomly Assigned Port)")
+                else:
+                    print(f"|-[Instance]")
                 print(f"| |- Owner: {instance["owner"][0]}({instance["owner"][1]})]")
                 print(f"| |- Access: {instance["access_history"]}]")
                 print(f"| |- Family: {instance["family"]} - Type: {instance["type"]}]")
@@ -690,7 +697,10 @@ class FirmAE(EmulationEngines):
             item = self.reportStruct.port_activity.port_history[port]
             output = f"[Port {port}]\n"
             for instance in item["instances"]:
-                output += f"|-[Instance]\n"
+                if (instance["random"]):
+                    output += f"|-[Instance] (Randomly Assigned Port)\n"
+                else:
+                    output += f"|-[Instance]\n"
                 output += f"| |- Owner: {instance["owner"][0]}({instance["owner"][1]})]\n"
                 output += f"| |- Access: {instance["access_history"]}]\n"
                 output += f"| |- Timestamps: {instance["times"][0]} - {instance["times"][1]}]\n"
