@@ -266,22 +266,18 @@ class CriticalBinary:
         return "unknown"
 
     def dynamic_linked_libraries(self):
-        command = ["ldd", self.path]
-        artifacts = []
         
+        command = f"readelf -d '{self.path}' | grep NEEDED | awk -F'[][]' '{{print $2}}'"
+        artifacts = []
         try:
-            result = subprocess.run(command, capture_output=True, text=True, check=True)
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
             for line in result.stdout.splitlines():
-                if "=>" in line:
-                    parts = line.split("=>")
-                    if len(parts) == 2:
-                        lib_name = parts[0].strip()
-                        lib_path = parts[1].strip().split()[0]
-                        artifacts.append({"library": lib_name, "path": lib_path})
-        except subprocess.CalledProcessError as e:
+                artifacts.append((line.strip(), "Primary"))
+        except subprocess.CalledProcessError:
             return []
         
         return artifacts
+
 
     # TODO: Perform Strings search inside the binary to extract version    
     def version_extraction(self):
