@@ -23,7 +23,7 @@ def graybox(args):
     if args.firmware is None:
 
         log.message("info", "No firmware path given, demo will be run")
-        firmware = "/home/porichis/dit-thesis/DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip"
+        firmware = DEMO_PATH
     else:
         firmware = args.firmware
 
@@ -52,16 +52,20 @@ def graybox(args):
         engine.network_fix()
         return
 
-    log.message("info", "Initial systemcall tracking started")
-    output = engine.check()
+    try:
+        log.message("info", "Initial systemcall tracking started")
+        output = engine.check()
 
-    log.message("info", "Emulated port verification started")
-    engine.emulate()
-    log.message("info", "Nmap analysis on given target started")
-    engine.verification()
-    engine.terminate()
-    engine.result_output()
-
+        log.message("info", "Emulated port verification started")
+        engine.emulate()
+        log.message("info", "Nmap analysis on given target started")
+        engine.verification()
+        engine.terminate()
+        engine.result_output()
+    except Exception as e:
+        log.message("error", f"An error occurred during the scan: {e}", engine.name())
+        engine.reportStruct.result = "Failed"
+    
     Logger.generate_graybox_report(engine, engine.reportStruct)
 
     log.output(output)

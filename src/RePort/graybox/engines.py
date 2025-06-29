@@ -154,9 +154,7 @@ def install_all_engines():
 
 class FirmAE(EmulationEngines):
 
-    # PATH_TO_FIRMAE = "/home/dimitris/Documents/thesis/FirmAE/"
-    # PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmaInc/"
-    PATH_TO_FIRMAE = "/home/porichis/dit-thesis/engines/FirmAE/"
+    PATH_TO_FIRMAE = os.path.join(ENGINES_FOLDER, "FirmAE")
     flag_mapping = {"advanced": "-sV", "default": " "}
 
     DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
@@ -250,9 +248,8 @@ class FirmAE(EmulationEngines):
         input_file = self.reportStruct.logs + 'qemu.final.serial.log'
 
         log.message("info", "Analyzing systemcalls.", "FirmAE")
-        with open(input_file, 'r') as file:
+        with open(input_file, 'r', errors='ignore') as file:
             process_activity = {}
-
 
             critical_processes = set()
             reverse_port_mapping = {}
@@ -439,7 +436,7 @@ class FirmAE(EmulationEngines):
         print(f"Pid matched: {self.reportStruct.port_activity.critical_processes}")
         pid_to_binary = {}
         critical_binaries = {}
-        with open(input_file, 'r') as file:
+        with open(input_file, 'r', errors='ignore') as file:
 
             for line in file:
 
@@ -607,7 +604,7 @@ class FirmAE(EmulationEngines):
         reader_thread = threading.Thread(target=check_ready, args=(process, target_text, result))
         reader_thread.start()
 
-        timeout_seconds = 360
+        timeout_seconds = 900
         reader_thread.join(timeout_seconds)
 
         if reader_thread.is_alive():
