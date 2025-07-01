@@ -36,7 +36,7 @@ jobs:
       - name: Setup RePort
         run: |
           cd src
-          sudo -E python -p RePort.report -install
+          sudo -E python -m RePort.report -install
 
       - name: Run Graybox Mapping on the demo firmware
         run: |
