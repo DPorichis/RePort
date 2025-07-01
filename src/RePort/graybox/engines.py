@@ -552,7 +552,7 @@ class FirmAE(EmulationEngines):
         command = ["sudo", "-E", "./run.sh", "-c", self.reportStruct.brand, os.path.abspath(self.reportStruct.firware_path)]
         try:
             log.message("info", "Elavated permissions are required, enter sudo password if prompted", "FirmAE")
-            result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)
+            result = subprocess.run(command, cwd=self.PATH_TO_FIRMAE, text=True, check=True)            
         except subprocess.CalledProcessError as e:
             return f"Error: {e.stderr}"
         
@@ -578,6 +578,16 @@ class FirmAE(EmulationEngines):
         def check_ready(process, target, result_flag):
             for line in process.stdout:
                 print(line)
+
+                # Check if we recieved the target IP address
+                ip_pattern = r'\b((?:\d{1,3}\.){3}\d{1,3})\b true'
+                if re.search(ip_pattern, line):
+                    ip_address = re.search(ip_pattern, line).group(1)
+                    self.reportStruct.ip_address = ip_address
+                    log.message("info", f"Emulation IP address set to: {ip_address}", "FirmAE -run")
+                    result_flag['running'] = True
+                    break
+
                 if target in line:
                     result_flag['running'] = True
                     break
