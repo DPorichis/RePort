@@ -6,6 +6,9 @@ import subprocess
 
 log = Logger("Graybox Monitor")
 
+DEMO_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip")
+
+
 # Example usage
 def graybox(args):
     if args.le:
@@ -67,6 +70,41 @@ def graybox(args):
         engine.reportStruct.result = "Failed"
     
     Logger.generate_graybox_report(engine, engine.reportStruct)
+
+    log.output(f"Scan completed with result: {engine.reportStruct.result}")
+
+    # Calculate stats    
+    port_count = len(engine.reportStruct.port_activity.port_history)
+    instances_count = 0
+
+    for port in engine.reportStruct.port_activity.port_history.keys():
+        instances_count += len(engine.reportStruct.port_activity.port_history[port]["instances"])
+    
+
+    cve_count = 0
+    outward_count = 0
+    binaries_with_cves = 0
+    outward_count_with_cves = 0
+
+
+    for binary in engine.reportStruct.port_activity.binary_report.keys():
+        ccount = len(engine.reportStruct.port_activity.binary_report[binary]["CVEs"])
+        ocount = len(engine.reportStruct.port_activity.binary_report[binary]["access"])
+        if ccount > 0:
+            binaries_with_cves += 1
+            cve_count += ccount
+        
+        if ocount > 0:
+            outward_count += 1
+            if ccount > 0:
+                outward_count_with_cves += 1
+        
+    log.output(f"Graybox Scan Summary:")
+    log.output(f"{port_count} ports found, with {instances_count} instances")
+    log.output(f"{outward_count} Outward Facing Binaries found")
+    log.output(f"{cve_count} CVEs across {binaries_with_cves} binaries")    
+    log.output(f"Outward Facing Binaries with CVEs: {outward_count_with_cves}")
+    
 
     log.output(output)
 

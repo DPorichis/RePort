@@ -154,7 +154,7 @@ def install_all_engines():
 
 class FirmAE(EmulationEngines):
 
-    PATH_TO_FIRMAE = os.path.join(ENGINES_FOLDER, "FirmAE")
+    PATH_TO_FIRMAE = os.path.join(ENGINES_FOLDER, "FirmAE") + "/"
     flag_mapping = {"advanced": "-sV", "default": " "}
 
     DATABASE_NAME = os.getenv("FIRMAE_DB_NAME", "firmware")
