@@ -1,0 +1,13 @@
+beautifulsoup4==4.13.4
+bs4==0.0.2
+coloredlogs==15.0.1
+cstruct==2.1
+humanfriendly==10.0
+Jinja2==3.1.6
+MarkupSafe==3.0.2
+psycopg2-binary==2.9.10
+python-lzo==1.14
+python-magic==0.4.27
+setuptools==79.0.0
+soupsieve==2.7
+typing_extensions==4.14.0
