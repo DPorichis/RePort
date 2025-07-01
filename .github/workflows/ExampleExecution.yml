@@ -32,14 +32,14 @@ jobs:
           pip install -r requirements.txt
 
           cd src
-          sudo -E ../env/bin/python -m RePort.report -install
+          sudo -E ../myenv/bin/python -m RePort.report -install
 
      
       - name: Run Graybox Mapping on the demo firmware
         run: |
-          python -m venv myenv
+          source myenv/bin/activate
           cd src
-          sudo ../env/bin/python -m RePort.report -gray -firmware ../DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip
+          sudo ../myenv/bin/python -m RePort.report -gray -firmware ../DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip
                 
       - name: Package the artifacts
         uses: actions/upload-artifact@v4
