@@ -21,27 +21,25 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install system dependencies
+      - name: Install dependencies and RePort
         run: |
           sudo apt-get update
           sudo apt-get install -y liblzo2-dev
 
-      - name: Get all python dependencies for RePort
-        run: |
-          python3 -m venv myenv
+          python -m venv myenv
           source myenv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-      
-      - name: Setup RePort
-        run: |
+
           cd src
           sudo -E python -m RePort.report -install
 
+     
       - name: Run Graybox Mapping on the demo firmware
         run: |
+          python -m venv myenv
           cd src
-          python3 -m RePort.report -gray -firmware ../DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip
+          python -m RePort.report -gray -firmware ../DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip
                 
       - name: Package the artifacts
         uses: actions/upload-artifact@v4
