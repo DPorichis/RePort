@@ -75,7 +75,7 @@ jobs:
 
           # Find RePort.html, and systemcalls.log files and rename them for consistency
           cp "$subdir/RePort.html" ${{ matrix.firmware }}_Report.html
-          cp "$subdir/syscall.log" ${{ matrix.firmware }}_systemcalls.log
+          cp "$subdir/systemcalls.log" ${{ matrix.firmware }}_systemcalls.log
           mv eval.csv ${{ matrix.firmware }}_eval.csv
 
       - name: Package the artifacts
