@@ -61,19 +61,27 @@ jobs:
         run: |
           source myenv/bin/activate
           cd src
-          sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../dataset/RePortDataset/${{ matrix.firmware }}
+          sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../dataset/RePortDataset/${{ matrix.firmware }} -eval
         continue-on-error: true
 
-      - name: Package the artifacts
+      - name: Prepare artifacts
+        id: find_report
         run: |
-          zip -r reports.zip reports/ || true
+
+          # find the reports directory
+          subdir=$(find reports/ -mindepth 1 -maxdepth 1 -type d)
+
+          # Find RePort.html, and systemcalls.log files and rename them for consistency
+          cp "$subdir/RePort.html" ~/${{ matrix.firmware }}_Report.html
+          cp "$subdir/syscall.log" ~/${{ matrix.firmware }}_systemcalls.log
+          mv ~/eval.csv ~/${{ matrix.firmware }}_eval.csv
 
       - name: Package the artifacts
         if: always()  # Upload artifacts even if scan failed
         uses: actions/upload-artifact@v4
         with:
           name: scan-${{ matrix.firmware }}
-          path: reports.zip
+          path: ~/${{ matrix.firmware }}_Report.html, ~/${{ matrix.firmware }}_systemcalls.log, ~/${{ matrix.firmware }}_eval.csv
           if-no-files-found: warn
 
   combine-results:
@@ -87,14 +95,31 @@ jobs:
         with:
           path: all-scans
 
-      - name: Combine results
+      - name: Combine csv results
         run: |
           mkdir combined
-          zip -j combined.zip combined/* || echo "No files to zip"
-          echo "Combined ZIP created"
+          
+          output_file="eval_combined.csv"
 
-      - name: Upload combined ZIP artifact
+          echo "FirmwareName, Result, Time, PortCount, InstanceCount, OutwardCount, CVECount, CVEBinariesCount, OutwardCVECount" > "$output_file"
+          
+          find all-scans/ -type f -name "*_eval.csv" | while read file; do
+            echo "Processing $file"
+            
+            # Append the contents of each eval.csv file to the combined output file
+            cat "$file" >> "$output_file"
+          done
+
+          zip -r all-scans.zip all-scans/* || echo "No files to zip"
+
+      - name: Upload all-scans ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: combined-reports
-          path: combined.zip
+          name: all-scan-results
+          path: all-scans.zip
+
+      - name: Upload combined CSV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-eval-reports
+          path: eval_combined.csv
