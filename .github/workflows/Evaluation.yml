@@ -61,7 +61,7 @@ jobs:
         run: |
           source myenv/bin/activate
           cd src
-          sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../dataset/${{ matrix.firmware }}
+          sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../dataset/RePortDataset/${{ matrix.firmware }}
         continue-on-error: true
 
       - name: Package the artifacts
