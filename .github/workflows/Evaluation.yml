@@ -5,6 +5,7 @@ on:
 
 jobs:
   scan:
+    timeout-minutes: 50
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false  # Prevent cancelling all matrix jobs if one fails
@@ -66,9 +67,9 @@ jobs:
           subdir=$(find reports/ -mindepth 1 -maxdepth 1 -type d | grep "${{ matrix.firmware }}")
 
           # Find RePort.html, and systemcalls.log files and rename them for consistency
-          cp "$subdir/RePort.html" "$HOME/${{ matrix.firmware }}_Report.html"
-          cp "$subdir/systemcalls.log" "$HOME/${{ matrix.firmware }}_systemcalls.log"
-          cp "$subdir/eval.csv" "$HOME/${{ matrix.firmware }}_eval.csv"
+          cp "$subdir/RePort.html" ${{ matrix.firmware }}_Report.html
+          cp "$subdir/systemcalls.log" {{ matrix.firmware }}_systemcalls.log
+          cp "$subdir/eval.csv" ${{ matrix.firmware }}_eval.csv
 
           ls -l
 
@@ -80,10 +81,10 @@ jobs:
         with:
           name: scan-${{ matrix.firmware }}
           path: |
-            $HOME/${{ matrix.firmware }}_Report.html
-            $HOME/${{ matrix.firmware }}_systemcalls.log
-            $HOME/${{ matrix.firmware }}_eval.csv
-          if-no-files-found: warn
+            ${{ matrix.firmware }}_Report.html
+            ${{ matrix.firmware }}_systemcalls.log
+            ${{ matrix.firmware }}_eval.csv
+          if-no-files-found: error
 
   combine-results:
     runs-on: ubuntu-latest
