@@ -51,7 +51,7 @@ jobs:
 
       - name: Prepare the firmware
         run: |
-          FILE_ID=YOUR_FILE_ID_HERE
+          FILE_ID=1W6nxlOMDohrG97PvDi9Bfw6zb2sRhu0B
           gdown https://drive.google.com/uc?id=$FILE_ID -O firmwares.zip
 
       - name: Unzip the downloaded file
@@ -78,8 +78,8 @@ jobs:
 
   combine-results:
     runs-on: ubuntu-latest
-    needs: scan  # Will only run if 'scan' job succeeds
-    if: success()  # Only run if previous jobs succeeded
+    needs: scan
+    if: success()
 
     steps:
       - name: Download all scan results
