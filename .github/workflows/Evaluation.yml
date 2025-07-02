@@ -65,11 +65,15 @@ jobs:
         continue-on-error: true
 
       - name: Package the artifacts
+        run: |
+          zip -r reports.zip reports/
+
+      - name: Package the artifacts
         if: always()  # Upload artifacts even if scan failed
         uses: actions/upload-artifact@v4
         with:
           name: scan-${{ matrix.firmware }}
-          path: reports/
+          path: reports.zip
           if-no-files-found: warn
 
   combine-results:

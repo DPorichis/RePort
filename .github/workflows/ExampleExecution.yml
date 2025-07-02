@@ -36,9 +36,13 @@ jobs:
           source myenv/bin/activate
           cd src
           sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip
-                
+      
+      - name: Package the artifacts
+        run: |
+          zip -r reports.zip reports/
+      
       - name: Package the artifacts
         uses: actions/upload-artifact@v4
         with:
           name: reports-artifact
-          path: reports/
+          path: reports.zip
