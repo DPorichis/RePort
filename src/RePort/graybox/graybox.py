@@ -115,7 +115,7 @@ def graybox(args):
     if args.eval:
         file_path = os.path.expanduser("~/eval.csv")
         with open(file_path, "w") as file:
-            eval_str = f"{engine.reportStruct.result},{emulation_time},{port_count},{instances_count},{outward_count},{cve_count},{binaries_with_cves},{outward_count_with_cves}\n"
+            eval_str = f"{os.path.basename(engine.reportStruct.firware_path)},{engine.reportStruct.result},{emulation_time},{port_count},{instances_count},{outward_count},{cve_count},{binaries_with_cves},{outward_count_with_cves}\n"
             file.write(eval_str)
 
     if engine.reportStruct.result == "Failed":
