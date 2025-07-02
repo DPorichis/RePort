@@ -69,15 +69,15 @@ class Logger:
                 port_report["random"] = "false"
             port_report["port"] = port
             port_report["noi"] = len(activity_list)
-            if "verification" in graybox.port_activity.port_history[port].keys() and graybox.port_activity.port_history[port]["verification"] is not None:
-                print(graybox.port_activity.port_history[port]["verification"])
-                port_report["verified"] = "true"    
+            if "confirmation" in graybox.port_activity.port_history[port].keys() and graybox.port_activity.port_history[port]["confirmation"] is not None:
+                print(graybox.port_activity.port_history[port]["confirmation"])
+                port_report["confirmed"] = "true"    
             elif "END" not in activity_list[-1]["timeframe"]:
-                port_report["verified"] = "NA"
+                port_report["confirmed"] = "NA"
             elif activity_list[-1]["type"] != "TCP":
-                port_report["verified"] = "Unsupported"
+                port_report["confirmed"] = "Unsupported"
             else:
-                port_report["verified"] = "false"
+                port_report["confirmed"] = "false"
             port_report["lpu"] = activity_list[-1]["type"]
             port_report["activity"] = activity_list
             port_activity.append(port_report)
@@ -149,10 +149,10 @@ class Logger:
             item["cves"] = activity_list
             cve_report.append(item)
 
-        if graybox.black_verification is None:
-            verification_engine = "Disabled"
+        if graybox.black_confirmation is None:
+            confirmation_engine = "Disabled"
         else:
-            verification_engine = graybox.black_verification.name()
+            confirmation_engine = graybox.black_confirmation.name()
 
 
         # Example input data
@@ -160,7 +160,7 @@ class Logger:
             "firmware_name": os.path.basename(graybox.firware_path),
             "mode": "Graybox Analysis",
             "md5_hash": graybox.md5_hash,
-            "blackbox_engine": verification_engine,
+            "blackbox_engine": confirmation_engine,
             "result": graybox.result,
             "graybox_engine": engine.name(),
             "report_folder": os.path.basename(graybox.report_path),

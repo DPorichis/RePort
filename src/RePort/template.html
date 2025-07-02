@@ -247,7 +247,7 @@
       <th class="first" style="width: 20%;">Port</th>
       <th style="width: 20%; text-align: center;">Number of binds</th>
       <th style="width: 20%; text-align: center;">Last Protocol Used</th>
-      <th style="width: 20%; text-align: center;">Verified</th>
+      <th style="width: 20%; text-align: center;">confirmed</th>
       <th class="last" style="width: 20%;"></tr>
     </tr>
     {% for instance in port_activity %}
@@ -260,14 +260,14 @@
       <td style="text-align: center;">{{ instance.noi }}</td>
       <td style="text-align: center;">{{ instance.lpu }}</td>
       <td style="text-align: center;">
-        {% if instance.verified == "true" %}
-          <span class="status-circle green" title="Verified"></span>
-        {% elif instance.verified == "false" %}
-          <span class="status-circle red" title="Not Verified"></span>
-        {% elif instance.verified == "NA" %}
-          <span class="status-circle black" title="Port closed before verification"></span>
+        {% if instance.confirmed == "true" %}
+          <span class="status-circle green" title="confirmed"></span>
+        {% elif instance.confirmed == "false" %}
+          <span class="status-circle red" title="Not confirmed"></span>
+        {% elif instance.confirmed == "NA" %}
+          <span class="status-circle black" title="Port closed before confirmation"></span>
         {% else %}
-          <span class="status-circle yellow" title="Can't be verified"></span>
+          <span class="status-circle yellow" title="Can't be confirmed"></span>
         {% endif %}
       </td>
       <td class="last">Click for details</td>

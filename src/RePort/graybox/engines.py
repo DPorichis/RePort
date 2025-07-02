@@ -107,19 +107,19 @@ class EmulationEngines(ABC):
         binary = CriticalBinary(path, name, cert, ports)
         return binary
 
-    def verification(self):
+    def confirmation(self):
         """
-        Performs blackbox verification on the emulated target
+        Performs blackbox confirmation on the emulated target
         """
         blackbox = NmapEngine(ip=self.reportStruct.ip_address)        
         blackbox.scan(self.reportStruct.ip_address, "advanced", self.reportStruct.port_activity.ports_used)
         for port in blackbox.reportStruct.ports.keys():
             if blackbox.reportStruct.ports[port][0]["state"] == "open" and port in self.reportStruct.port_activity.ports_used:
                 if port in self.reportStruct.port_activity.port_history.keys():
-                    self.reportStruct.port_activity.port_history[port]["verification"] = blackbox.reportStruct.ports[port][0]
+                    self.reportStruct.port_activity.port_history[port]["confirmation"] = blackbox.reportStruct.ports[port][0]
                 else:
-                    log.message("warn", f"Port {port} was found open, but no logs of it where tracked", "Graybox Verification")
-        self.reportStruct.black_verification = blackbox
+                    log.message("warn", f"Port {port} was found open, but no logs of it where tracked", "Graybox confirmation")
+        self.reportStruct.black_confirmation = blackbox
         return
 
     @abstractmethod
@@ -216,13 +216,61 @@ class FirmAE(EmulationEngines):
         
     def analysis(self):
 
+        """ Searches the fs for files that match the execve calls and associates them with the PIDs."""
+        def execcall_to_filepath(pid, timestamp, proc_name, argv, env_vars):
+            home = env_vars.get("HOME", "")
+            path = env_vars.get("PATH", "")
+            shell = env_vars.get("SHELL", "")
+
+            argv_list = shlex.split(argv)
+            path_list = path.split(':')
+            # print(argv_list)
+
+            cmd = argv_list[0]
+            possible_locations = []
+
+
+            if cmd == "sh":
+                # Find the bash script
+                for arg in argv_list:
+                    if arg != "sh" and arg[0] != '-':
+                        cmd = arg
+                        break
+
+            # Absolute path call - Assign to the path directly
+            if cmd[0] == "/":
+                cmd = argv_list[0].lstrip("/")
+                target_binary = os.path.join(cache_dir, cmd)
+                possible_locations.append(target_binary)
+
+            # Create a possible path for each item inside of the $PATH
+            for p in path_list:
+                folder = p.lstrip("/")
+                target_binary = os.path.join(cache_dir, folder, cmd)
+                possible_locations.append(target_binary)
+
+            # Check if this file exists or not
+            item = None
+            for target in possible_locations:
+                if os.path.isfile(target):
+                    item = (timestamp, target, argv)
+                    # print(f"Found binary file at: {target}")
+                    break
+            
+            # If it doesn't exist just add it as unknown path
+            if item is None:
+                # log.message("warn", "No binary found")
+                item = (timestamp, "Unknown", argv)
+            
+            return item
+
         # Pattern for retriving fork calls:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Clone Flags | 5 - Stack Size
         fork_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+do_fork\[PID:\s*(\d+)\s+\(([^)]+)\)\]:\s+clone_flags:0x([0-9a-fA-F]+),\s+stack_size:0x([0-9a-fA-F]+)"
         
         # Pattern for retriving fork return values:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - Child PID
-        fork_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+do_fork_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*(\d+)"
+        fork_ret_pattern = r"\[\s*(\d+\.\d+)\]\s+firmadyne:\s+do_fork_ret\[PID:\s*(\d+)\s+\(([^)]+)\)\]\s*=\s*-?(\d+)"
         
         # Pattern for retriving bind calls:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - fd | 5 - Family | 6 - Port
@@ -431,98 +479,156 @@ class FirmAE(EmulationEngines):
         # Pattern for retriving execve argument values:
         # 1 - Timestamp | 2 - PID | 3 - Process Name | 4 - argv | 5 - env
         # execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*\[\s*([^\]]+?)\s*],\s*envp:\s*PATH=([^ ]+)\s+HOME=([^ ]+)\s+SHELL=([^\s]+)"
-        execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*([^\]]+?),\s*envp:\s*(.+)"
+        execve_pattern = r"\[\s*(\d+\.\d+)]\s+firmadyne:\s+do_execve\[PID:\s*(\d+)\s+\(([^)]+)\)]:\s+argv:\s*(.+?),\s*envp:\s*(.+)"
 
         print(f"Pid matched: {self.reportStruct.port_activity.critical_processes}")
-        pid_to_binary = {}
-        critical_binaries = {}
+        
+        # Associate execve calls with PIDs
+        unmatched_pids = self.reportStruct.port_activity.critical_processes
+        
+        # Initial search for direct execve calls
         with open(input_file, 'r', errors='ignore') as file:
-
             for line in file:
-
                 # Search for execve systemcalls
                 match = re.search(execve_pattern, line)
                 if match:
                     pid = int(match.group(2))
                     if pid in self.reportStruct.port_activity.critical_processes:
-                        # print(f"Pid matched: {pid}")
+                        print(f"Pid matched: {pid}")
+                        unmatched_pids.discard(pid)
+                        
                         timestamp = float(match.group(1))
                         proc_name = match.group(3)
                         argv = match.group(4)
                         env = match.group(5)
                         env_vars = dict(kv.split("=", 1) for kv in env.split() if "=" in kv)
+                                                  
+                        item = execcall_to_filepath(pid, timestamp, proc_name, argv, env_vars)
+                        self.reportStruct.port_activity.corelate_execve(pid, item)
 
-                        home = env_vars.get("HOME", "")
-                        path = env_vars.get("PATH", "")
-                        shell = env_vars.get("SHELL", "")
+        # If there are still unmatched PIDs, we need to backtrack and find their parents execve calls 
+        cround = 0
+        parent_to_child = {}
+        if len(unmatched_pids) > 0:
+            log.message("warn", f"Some PIDs were not matched: {unmatched_pids}, starting backtracking retrival", "FirmAE")
+            with open(input_file, 'r', errors='ignore') as file:
+                for line in file:
+                    # Search for his parents fork systemcalls
+                    match = re.search(fork_ret_pattern, line)
+                    if match:
+                        timestamp = float(match.group(1))
+                        pid = int(match.group(2))
+                        child_pid = int(match.group(4))
+                        if child_pid in unmatched_pids:
+                            if pid not in parent_to_child.keys():
+                                parent_to_child[pid] = {"children": [], "execs": []}
+                            parent_to_child[pid]["children"].append((child_pid, timestamp))
+
+        # Iteratively search for execve calls of parents until all PIDs are matched (or a maximum of 10 rounds)
+        while len(unmatched_pids) > 0 and cround < 10:
+
+            with open(input_file, 'r', errors='ignore') as file:
+                for line in file:
+                    # Search for his parents execve systemcalls
+                    match = re.search(execve_pattern, line)
+                    if match:
+                        pid = int(match.group(2))
+                        if pid in parent_to_child.keys():
+                            # Cache the execs for checking later
+                            parent_to_child[pid]["execs"].append(match)
+
+
+            for pid in parent_to_child.keys():
+                log.message("warn", f"Checking PID {pid} as parent of {parent_to_child[pid]["children"]}", "FirmAE")
+
+                if len(unmatched_pids) == 0:
+                    break
+                # Check all done by the parent process in verse order
+                for exec_call in reversed(parent_to_child[pid]["execs"]):
+                    timestamp = float(exec_call.group(1))
+                    proc_name = exec_call.group(3)
+                    argv = exec_call.group(4)
+                    env = exec_call.group(5)
+                    env_vars = dict(kv.split("=", 1) for kv in env.split() if "=" in kv)
+                    log.message("warn", f"Checking child PID {pid} {timestamp} execve call for remaining PIDs {parent_to_child[pid]}", "FirmAE")
+
+                    home = env_vars.get("HOME", "")
+                    path = env_vars.get("PATH", "")
+                    shell = env_vars.get("SHELL", "")
+                    
+                    # Find that were created after this execve call
+                    children_assigned = set()
+                    for child_pid, fork_timestamp in parent_to_child[pid]["children"]:
+                        log.message("info", f"Checking child PID {pid} {timestamp} vs {child_pid} {fork_timestamp} for execve call", "FirmAE")
+                        if float(timestamp) < float(fork_timestamp):
+                            children_assigned.add(child_pid)
+
+                    # If there are no children, we can skip this execve call
+                    if len(children_assigned) == 0:
+                        continue
+
+                    item = execcall_to_filepath(pid, timestamp, proc_name, argv, env_vars)
                         
+                    # Append this findings to all childern that were assigned to this execve call
+                    for child_pid in children_assigned:
+                        self.reportStruct.port_activity.corelate_execve(child_pid, item)
 
-                        argv_list = shlex.split(argv)
-                        path_list = path.split(':')
-                        # print(argv_list)
+                    # Remove all assigned children from the parent_to_child mapping
+                    for child in children_assigned:
+                        unmatched_pids.discard(child)
+                
+                        for item in parent_to_child[pid]["children"]:
+                            if item[0] == child:
+                                parent_to_child[pid]["children"].remove(item)
+                    
+                    # If there are no children left, we can break
+                    if len(parent_to_child[pid]["children"]) == 0:
+                        break
 
-                        cmd = argv_list[0]
-                        possible_locations = []
+                    if len(unmatched_pids) == 0:
+                        break
 
+            # Remove all parents that have no children left untracked
+            for pid in list(parent_to_child.keys()):
+                if len(parent_to_child[pid]["children"]) == 0:
+                    del parent_to_child[pid]
 
-                        if cmd == "sh":
-                            # Find the bash script
-                            for arg in argv_list:
-                                if arg != "sh" and arg[0] != '-':
-                                    cmd = arg
-                                    break
+            # If after this round there are still unmatched PIDs, we need to check their grandparents
+            if len(unmatched_pids) > 0:
+                check_grandparents = set(parent_to_child.keys())
+                with open(input_file, 'r', errors='ignore') as file:
+                    for line in file:
+                        # Search for his parents fork systemcalls
+                        match = re.search(fork_ret_pattern, line)
+                        if match:
+                            timestamp = float(match.group(1))
+                            pid = int(match.group(2))
+                            child_pid = int(match.group(4))
+                            if child_pid in check_grandparents:
+                                if pid not in parent_to_child.keys():
+                                    parent_to_child[pid] = {"children": parent_to_child[child_pid]["children"], "execs": []}
+                                parent_to_child[pid]["children"].extend(parent_to_child[child_pid]["children"])
+                                del parent_to_child[child_pid]
+                                check_grandparents.discard(child_pid)
 
-                        # Absolute path call - Assign to the path directly
-                        if cmd[0] == "/":
-                            cmd = argv_list[0].lstrip("/")
-                            target_binary = os.path.join(cache_dir, cmd)
-                            possible_locations.append(target_binary)
-
-                        # Create a possible path for each item inside of the $PATH
-                        for p in path_list:
-                            folder = p.lstrip("/")
-                            target_binary = os.path.join(cache_dir, folder, cmd)
-                            possible_locations.append(target_binary)
-
-                        # Check if this file exists or not
-                        item = None
-                        for target in possible_locations:
-                            if os.path.isfile(target):
-                                item = (timestamp, target, argv)
-                                # print(f"Found binary file at: {target}")
-                                break
-                        
-                        # If it doesn't exist just add it as unknown path
-                        if item is None:
-                            # log.message("warn", "No binary found")
-                            item = (timestamp, "Unknown", argv)
-                        
-                        if pid not in pid_to_binary.keys():
-                            pid_to_binary[pid] = [item]
-                        else:
-                            exists = False
-                            for other in pid_to_binary[pid]:
-                                if item[1] == other[1] and item[2] == other[2]:
-                                    exists = True
-                                    break
-                            if not exists:
-                                pid_to_binary[pid].append(item)
-                        
-                        if item[1] != "Unknown":
-                            if item[1] not in critical_binaries.keys():
-                                critical_binaries[item[1]] = {"pids": set(),
-                                                             "owns": set(),
-                                                             "access": set(),
-                                                             "CVEs": []}
-                            critical_binaries[item[1]]["pids"].add(pid)
+                cround += 1
+                if cround < 10:
+                    log.message("info", f"[Round {cround}]Some PIDs were not matched: {unmatched_pids}, another round will be run", "FirmAE")
+                else:
+                    log.message("error", f"[Round {cround}]Some PIDs were not matched: {unmatched_pids}, no more rounds will be run", "FirmAE")
+                    break
+                continue
+            else:
+                cround += 1
+                log.message("info", f"[Round {cround}] All PIDs were matched, no more rounds will be run", "FirmAE")
+                unmatched_pids.clear()
+            break
 
         # print(critical_binaries)
 
         # for pid in pid_to_binary.keys():
         #     print(f"PID: {pid} | {pid_to_binary[pid]}")
         
-        self.reportStruct.port_activity.binary_report = critical_binaries
-
         CveLookup.run_grype_on_directory(self.reportStruct)
 
         shutil.copy(input_file, os.path.join(self.reportStruct.report_path, "systemcalls.log"))
@@ -533,10 +639,11 @@ class FirmAE(EmulationEngines):
             ports = set()
             owns = set()
             for pid in self.reportStruct.port_activity.binary_report[binary]["pids"]:
-                for port in self.reportStruct.port_activity.pid_to_ports[pid]["access"]:
-                    ports.add(port)
-                for port in self.reportStruct.port_activity.pid_to_ports[pid]["owns"]:
-                    owns.add(port)
+                if pid in self.reportStruct.port_activity.pid_to_ports.keys():
+                    for port in self.reportStruct.port_activity.pid_to_ports[pid]["access"]:
+                        ports.add(port)
+                    for port in self.reportStruct.port_activity.pid_to_ports[pid]["owns"]:
+                        owns.add(port)
             self.reportStruct.port_activity.binary_report[binary]["access"] = ports 
             self.reportStruct.port_activity.binary_report[binary]["owns"] = owns
             self.reportStruct.port_activity.binary_report[binary]["label"] = self.binary_profiling(binary, "", list(ports))
@@ -711,20 +818,20 @@ class FirmAE(EmulationEngines):
                 output += f"| |- Owner: {instance["owner"][0]}({instance["owner"][1]})]\n"
                 output += f"| |- Access: {instance["access_history"]}]\n"
                 output += f"| |- Timestamps: {instance["times"][0]} - {instance["times"][1]}]\n"
-            if item["verification"] is not None:
-                output += f"|-(Verified)\n="
+            if item["confirmation"] is not None:
+                output += f"|-(Confirmed)\n="
             else:
-                output += f"|-(Not Verified)\n="
+                output += f"|-(Not Confirmed)\n="
             log.output(output)
 
         # for port in self.reportStruct.ports.keys():
         #     output = f"[Port {port}]\n" + f"|-(Possible Owner)\n" 
         #     for own in self.reportStruct.ports[port]["owners"]:
         #         output += self.reportStruct.critical_processes[own].owner_print()
-        #     if len(self.reportStruct.ports[port]["verification"]) != 0:
-        #         output += f"-- Verified\n="
+        #     if len(self.reportStruct.ports[port]["confirmation"]) != 0:
+        #         output += f"-- Confirmed\n="
         #     else:
-        #         output += f"-- Not Verified\n="
+        #         output += f"-- Not Confirmed\n="
         #     log.output(output)
 
 if __name__ == "__main__":

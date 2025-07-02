@@ -55,19 +55,19 @@ def graybox(args):
         engine.network_fix()
         return
 
-    try:
-        log.message("info", "Initial systemcall tracking started")
-        output = engine.check()
+    # try:
+    log.message("info", "Initial systemcall tracking started")
+    output = engine.check()
 
-        log.message("info", "Emulated port verification started")
-        engine.emulate()
-        log.message("info", "Nmap analysis on given target started")
-        engine.verification()
-        engine.terminate()
-        engine.result_output()
-    except Exception as e:
-        log.message("error", f"An error occurred during the scan: {e}", engine.name())
-        engine.reportStruct.result = "Failed"
+        # log.message("info", "Emulated port confirmation started")
+        # engine.emulate()
+        # log.message("info", "Nmap analysis on given target started")
+        # engine.confirmation()
+        # engine.terminate()
+    #     engine.result_output()
+    # except Exception as e:
+    #     log.message("error", f"An error occurred during the scan: {e}", engine.name())
+    #     engine.reportStruct.result = "Failed"
     
     Logger.generate_graybox_report(engine, engine.reportStruct)
 

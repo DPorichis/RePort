@@ -26,8 +26,8 @@ class GrayBoxScan:
         self.report_path = os.path.join(os.path.join(os.path.join(base_dir, "reports")), self.report_folder)
         os.makedirs(self.report_path, exist_ok=True)
 
-        # Blackbox Verification Information
-        self.black_verification = None
+        # Blackbox confirmation Information
+        self.black_confirmation = None
         self.ip_address = ip_address
     
         # Firmware ID
@@ -76,6 +76,9 @@ class PortActivity:
         # PID to Ports mapping        
         self.pid_to_ports = {}
 
+        # PID to binary executables mapping
+        self.pid_to_binary = {}
+
         # Path to Ports and CVE mapping
         self.binary_report = {}
 
@@ -104,7 +107,7 @@ class PortActivity:
                                                             "family": old["family"], "type": old["type"],
                                                             "random": old["random"]
                                                             }],
-                                                "verification": None
+                                                "confirmation": None
                                                 }
                 else:
                     self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
@@ -138,7 +141,7 @@ class PortActivity:
                                                                 "family": old["family"], "type": old["type"],
                                                                 "random": old["random"]
                                                                 }],
-                                                    "verification": None
+                                                    "confirmation": None
                                                     }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
@@ -177,7 +180,7 @@ class PortActivity:
                                                                 "family": old["family"], "type": old["type"],
                                                                 "random": old["random"]
                                                                 }],
-                                                    "verification": None
+                                                    "confirmation": None
                                                     }
                     else:
                         self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
@@ -234,7 +237,7 @@ class PortActivity:
                                                             "family": old["family"], "type": old["type"],
                                                             "random": old["random"]
                                                             }],
-                                                "verification": None
+                                                "confirmation": None
                                                 }
                 else:
                     self.port_history[port]["instances"].append({"owner": (old["owner"][0], old["owner"][1]),
@@ -253,6 +256,27 @@ class PortActivity:
                                             "owns": set()}
                     self.pid_to_ports[pid]["access"].add(port_label)
                 self.pid_to_ports[instance["owner"][1]]["owns"].add(port_label)
+
+    def corelate_execve(self, pid, item):
+        if pid not in self.pid_to_binary.keys():
+            self.pid_to_binary[pid] = [item]
+        else:
+            exists = False
+            for other in self.pid_to_binary[pid]:
+                if item[1] == other[1] and item[2] == other[2]:
+                    exists = True
+                    break
+            if not exists:
+                self.pid_to_binary[pid].append(item)
+        
+        if item[1] != "Unknown":
+            if item[1] not in self.binary_report.keys():
+                self.binary_report[item[1]] = {"pids": set(),
+                                            "owns": set(),
+                                            "access": set(),
+                                            "CVEs": []}
+            self.binary_report[item[1]]["pids"].add(pid)
+
 
 class CriticalBinary:
     def compute_sha256(self):
