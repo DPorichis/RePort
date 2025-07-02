@@ -51,11 +51,11 @@ jobs:
 
       - name: Prepare the firmware
         run: |
+          source myenv/bin/activate
           FILE_ID=1W6nxlOMDohrG97PvDi9Bfw6zb2sRhu0B
           gdown https://drive.google.com/uc?id=$FILE_ID -O firmwares.zip
+          unzip firmwares.zip -d dataset
 
-      - name: Unzip the downloaded file
-        run: unzip firmwares.zip -d dataset
 
       - name: Run Graybox Mapping on ${{ matrix.firmware }}
         run: |
@@ -66,7 +66,7 @@ jobs:
 
       - name: Package the artifacts
         run: |
-          zip -r reports.zip reports/
+          zip -r reports.zip reports/ || true
 
       - name: Package the artifacts
         if: always()  # Upload artifacts even if scan failed
