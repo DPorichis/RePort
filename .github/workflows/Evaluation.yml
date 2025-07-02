@@ -76,7 +76,7 @@ jobs:
           # Find RePort.html, and systemcalls.log files and rename them for consistency
           cp "$subdir/RePort.html" ${{ matrix.firmware }}_Report.html
           cp "$subdir/systemcalls.log" ${{ matrix.firmware }}_systemcalls.log
-          mv "$subdir/eval.csv" ${{ matrix.firmware }}_eval.csv
+          cp "$subdir/eval.csv" ${{ matrix.firmware }}_eval.csv
 
       - name: Package the artifacts
         if: always()  # Upload artifacts even if scan failed
