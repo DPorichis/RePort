@@ -1,0 +1,96 @@
+name: Firmware Graybox Scanning
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # Prevent cancelling all matrix jobs if one fails
+      matrix:
+        firmware: [
+          "FW_RT_AC5300_300438432738.ZIP",
+          "R7000-V1.0.5.64_1.1.88.zip",
+          "FW_TV-IP110WN_1.2.2.65.zip",
+          "TEW-657BRM_1.00.1.zip",
+          "RE450_V1_171215.zip",
+          "DCS-8200LH_REVA_FIRMWARE_1.02.03.zip",
+          "DIR868LWB1_FW200KR-K05.bin",
+          "DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip",
+          "F9K1015_WW_1.00.10.bin",
+          "AC1450-V1.0.0.34_10.0.16.zip"
+        ]
+
+    name: Scan ${{ matrix.firmware }}
+    continue-on-error: true  # Let all scans finish even if one fails
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies and RePort
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblzo2-dev
+
+          python -m venv myenv
+          source myenv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install gdown
+
+
+          cd src
+          sudo -E ../myenv/bin/python -m RePort.report -install
+
+      - name: Prepare the firmware
+        run: |
+          FILE_ID=YOUR_FILE_ID_HERE
+          gdown https://drive.google.com/uc?id=$FILE_ID -O firmwares.zip
+
+      - name: Unzip the downloaded file
+        run: unzip firmwares.zip -d dataset
+
+      - name: Run Graybox Mapping on ${{ matrix.firmware }}
+        run: |
+          source myenv/bin/activate
+          cd src
+          sudo -E ../myenv/bin/python -m RePort.report -gray -firmware ../dataset/${{ matrix.firmware }}
+        continue-on-error: true
+
+      - name: Package the artifacts
+        if: always()  # Upload artifacts even if scan failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-${{ matrix.firmware }}
+          path: reports/
+          if-no-files-found: warn
+
+  combine-results:
+    runs-on: ubuntu-latest
+    needs: scan  # Will only run if 'scan' job succeeds
+    if: success()  # Only run if previous jobs succeeded
+
+    steps:
+      - name: Download all scan results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-scans
+
+      - name: Combine results
+        run: |
+          mkdir combined
+          zip -j combined.zip combined/* || echo "No files to zip"
+          echo "Combined ZIP created"
+
+      - name: Upload combined ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-reports
+          path: combined.zip
