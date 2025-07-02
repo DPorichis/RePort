@@ -161,7 +161,7 @@ class FirmAE(EmulationEngines):
     DATABASE_USR = os.getenv("FIRMAE_DB_USER", "firmadyne")
     DATABASE_PSW = os.getenv("FIRMAE_DB_PSW", "firmadyne")
     
-    DATABASE_HOST = os.getenv("FIRMAE_DB_HOST", "localhost")
+    DATABASE_HOST = os.getenv("FIRMAE_DB_HOST", "127.0.0.1")
     DATABASE_PORT = os.getenv("FIRMAE_DB_PORT", "5432")
 
     def __init__(self, reportStruct=None, firmware='', ip='192.168.0.1'):
@@ -494,7 +494,7 @@ class FirmAE(EmulationEngines):
                 if match:
                     pid = int(match.group(2))
                     if pid in self.reportStruct.port_activity.critical_processes:
-                        print(f"Pid matched: {pid}")
+                        # print(f"Pid matched: {pid}")
                         unmatched_pids.discard(pid)
                         
                         timestamp = float(match.group(1))
@@ -510,7 +510,7 @@ class FirmAE(EmulationEngines):
         cround = 0
         parent_to_child = {}
         if len(unmatched_pids) > 0:
-            log.message("warn", f"Some PIDs were not matched: {unmatched_pids}, starting backtracking retrival", "FirmAE")
+            # log.message("warn", f"Some PIDs were not matched: {unmatched_pids}, starting backtracking retrival", "FirmAE")
             with open(input_file, 'r', errors='ignore') as file:
                 for line in file:
                     # Search for his parents fork systemcalls
@@ -539,7 +539,7 @@ class FirmAE(EmulationEngines):
 
 
             for pid in parent_to_child.keys():
-                log.message("warn", f"Checking PID {pid} as parent of {parent_to_child[pid]["children"]}", "FirmAE")
+                # log.message("warn", f"Checking PID {pid} as parent of {parent_to_child[pid]["children"]}", "FirmAE")
 
                 if len(unmatched_pids) == 0:
                     break
@@ -550,7 +550,7 @@ class FirmAE(EmulationEngines):
                     argv = exec_call.group(4)
                     env = exec_call.group(5)
                     env_vars = dict(kv.split("=", 1) for kv in env.split() if "=" in kv)
-                    log.message("warn", f"Checking child PID {pid} {timestamp} execve call for remaining PIDs {parent_to_child[pid]}", "FirmAE")
+                    # log.message("warn", f"Checking child PID {pid} {timestamp} execve call for remaining PIDs {parent_to_child[pid]}", "FirmAE")
 
                     home = env_vars.get("HOME", "")
                     path = env_vars.get("PATH", "")

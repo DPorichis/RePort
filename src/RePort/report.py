@@ -22,6 +22,9 @@ def main():
     parser.add_argument('-engine-mode', type=str, metavar='MODE', help="Selects on which mode the engine will be run")
     parser.add_argument('-engine-help', type=str, metavar='ENGINE', help="Prints the help text of the specified ENGINE")
 
+    parser.add_argument('-eval', action='store_true', help="Turns on evaluation mode, which will dump a simple csv with benchmarks for the github action to collect")
+
+
     args = parser.parse_args()
 
     if args.install:

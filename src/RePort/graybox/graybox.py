@@ -2,6 +2,7 @@ from RePort.graybox.engines import *
 from RePort.graybox.scan import *
 from ..utils import Logger
 import sys
+import time
 import subprocess
 
 log = Logger("Graybox Monitor")
@@ -30,7 +31,7 @@ def graybox(args):
     else:
         firmware = args.firmware
 
-
+    start_time = time.time()
     
     engine = FirmAE(firmware=firmware)
     if args.engine is not None:
@@ -55,21 +56,23 @@ def graybox(args):
         engine.network_fix()
         return
 
-    # try:
-    log.message("info", "Initial systemcall tracking started")
-    output = engine.check()
-
-        # log.message("info", "Emulated port confirmation started")
-        # engine.emulate()
-        # log.message("info", "Nmap analysis on given target started")
-        # engine.confirmation()
-        # engine.terminate()
-    #     engine.result_output()
-    # except Exception as e:
-    #     log.message("error", f"An error occurred during the scan: {e}", engine.name())
-    #     engine.reportStruct.result = "Failed"
+    try:
+        log.message("info", "Initial systemcall tracking started")
+        output = engine.check()
+        log.message("info", "Emulated port confirmation started")
+        engine.emulate()
+        log.message("info", "Nmap analysis on given target started")
+        engine.confirmation()
+        engine.terminate()
+        engine.result_output()
+    except Exception as e:
+        log.message("error", f"An error occurred during the scan: {e}", engine.name())
+        engine.reportStruct.result = "Failed"
     
     Logger.generate_graybox_report(engine, engine.reportStruct)
+
+    end_time = time.time()
+    emulation_time = end_time - start_time
 
     log.output(f"Scan completed with result: {engine.reportStruct.result}")
 
@@ -100,13 +103,23 @@ def graybox(args):
                 outward_count_with_cves += 1
         
     log.output(f"Graybox Scan Summary:")
+    log.output(f"Emulation Time: {emulation_time:.2f} seconds")
     log.output(f"{port_count} ports found, with {instances_count} instances")
     log.output(f"{outward_count} Outward Facing Binaries found")
     log.output(f"{cve_count} CVEs across {binaries_with_cves} binaries")    
     log.output(f"Outward Facing Binaries with CVEs: {outward_count_with_cves}")
     
-
     log.output(output)
+
+
+    if args.eval:
+        file_path = os.path.expanduser("~/eval.csv")
+        with open(file_path, "w") as file:
+            eval_str = f"{engine.reportStruct.result},{emulation_time},{port_count},{instances_count},{outward_count},{cve_count},{binaries_with_cves},{outward_count_with_cves}\n"
+            file.write(eval_str)
+
+    if engine.reportStruct.result == "Failed":
+        sys.exit(1)
 
 
 def blackbox_help():
