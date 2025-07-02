@@ -10,16 +10,8 @@ jobs:
       fail-fast: false  # Prevent cancelling all matrix jobs if one fails
       matrix:
         firmware: [
-          "FW_RT_AC5300_300438432738.ZIP",
-          "R7000-V1.0.5.64_1.1.88.zip",
           "FW_TV-IP110WN_1.2.2.65.zip",
-          "TEW-657BRM_1.00.1.zip",
-          "RE450_V1_171215.zip",
-          "DCS-8200LH_REVA_FIRMWARE_1.02.03.zip",
-          "DIR868LWB1_FW200KR-K05.bin",
-          "DIR-868L_fw_revB_2-05b02_eu_multi_20161117.zip",
-          "F9K1015_WW_1.00.10.bin",
-          "AC1450-V1.0.0.34_10.0.16.zip"
+          "TEW-657BRM_1.00.1.zip"
         ]
 
     name: Scan ${{ matrix.firmware }}
@@ -79,6 +71,8 @@ jobs:
           cp "$subdir/eval.csv" "$HOME/${{ matrix.firmware }}_eval.csv"
 
           ls -l
+
+          ls -l "$HOME"
 
       - name: Package the artifacts
         if: success()
