@@ -559,7 +559,7 @@ class FirmAE(EmulationEngines):
                     # Find that were created after this execve call
                     children_assigned = set()
                     for child_pid, fork_timestamp in parent_to_child[pid]["children"]:
-                        log.message("info", f"Checking child PID {pid} {timestamp} vs {child_pid} {fork_timestamp} for execve call", "FirmAE")
+                        # log.message("info", f"Checking child PID {pid} {timestamp} vs {child_pid} {fork_timestamp} for execve call", "FirmAE")
                         if float(timestamp) < float(fork_timestamp):
                             children_assigned.add(child_pid)
 
