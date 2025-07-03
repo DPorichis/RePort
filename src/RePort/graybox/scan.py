@@ -128,7 +128,7 @@ class PortActivity:
                 port = self.process_activity[pid][fd]["port"]
                 port_tag = (self.process_activity[pid][fd]["family"], self.process_activity[pid][fd]["type"])
                 if port not in self.open_ports.keys() or port_tag not in self.open_ports[port].keys():
-                    log.message("error", "Jim did something wrong", "Jim")
+                    # log.message("error", "FD missmatch", "Jim")
                     del self.process_activity[pid][fd]
                     return
                 self.open_ports[port][port_tag]["access"].remove(pid)
@@ -166,7 +166,7 @@ class PortActivity:
                 port = self.process_activity[pid][fd]["port"]
                 port_tag = (self.process_activity[pid][fd]["family"], self.process_activity[pid][fd]["type"])
                 if port not in self.open_ports.keys() or port_tag not in self.open_ports[port].keys():
-                    log.message("error", "Jim did something wrong on exit", "Jim")
+                    # log.message("error", "fd cleared on exit", "Jim")
                     continue
                 if pid in self.open_ports[port][port_tag]["access"]:
                     self.open_ports[port][port_tag]["access"].remove(pid)
