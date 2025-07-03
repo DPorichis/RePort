@@ -11,6 +11,29 @@ graph LR
     Em[Emulation & Systemcall tracking] --> Port[Port Discovery]
 ```
 
+## Running RePort
+
+**WARNING**: RePort is a research tool that requires elevated permissions. Potential users who want to run RePort are ***HIGHLY advised*** to do so on isolated virtual machines for their safety.
+
+To use RePort, clone this repository and create a Python virtual environment to install the dependencies listed in `requirements.txt`
+```
+git clone https://github.com/DPorichis/RePort
+cd RePort
+python -m venv env
+pip install -r ./requirements.txt
+```
+Then run the installation sequence to install all RePort's sub-modules
+```
+cd ./src
+sudo -E python -m RePort.report -install
+```
+
+After the installation is compeleted, you can run RePort on your target firmware by running:
+```
+cd ./src
+sudo -E python -m Report.report -gray -firmware [-Path to firmware-]
+```
+
 ## Bibliography
 
 1. **Hui Jun Tay, Kyle Zeng, Jayakrishna Menon Vadayath, Arvind S. Raj, Audrey Dutcher, Tejesh Reddy, Wil Gibbs, Zion Leonahenahe Basque, Fangzhou Dong, Zack Smith, Adam Doupé, Tiffany Bao, Yan Shoshitaishvili, and Ruoyu Wang.** 2023.  
