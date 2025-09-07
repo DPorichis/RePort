@@ -1,7 +1,18 @@
-# RePort - An automatic attack surface mapper
-**RePort** is an automated attack surface mapping tool designed to identify and analyze port operations within IoT firmware. It leverages firmware emulation engines to trace system calls and generate insightful reports on critical processes, open ports, and known vulnerabilities.
+# RePort - Automatically Mapping the Attack Surface of IoT Systems
 
-*This project was developed as part of D. Porichis' BSc thesis at the Department of Informatics and Telecommunications, National and Kapodistrian University of Athens.*
+**RePort** is an automated attack surface mapping tool designed to identify and analyze network exposure within IoT firmware through dynamic analysis. By leveraging firmware emulation engines and system call tracing, RePort automatically maps open ports, identifies critical binaries, and cross-references known vulnerabilities to provide actionable security insights.
+
+*This project was developed as part of [D. Porichis' BSc thesis](https://pergamos.lib.uoa.gr/item/uoadl:5298750) at the Department of Informatics and Telecommunications, National and Kapodistrian University of Athens, under the supervision of [Professor Thanassis Avgerinos](https://cgi.di.uoa.gr/~thanassis/).*
+
+## Key Features
+
+- **Automated Attack Surface Mapping**: Systematically identifies all network entry points in IoT firmware
+- **Dynamic Analysis**: Uses actual firmware emulation rather than static analysis for stateful, verifiable results  
+- **Vulnerability Discovery**: Cross-references identified binaries against CVE databases (403+ CVEs discovered in evaluation)
+- **Port-to-Binary Attribution**: Traces open ports back to their responsible executables through system call analysis
+- **Dual Analysis Modes**: Supports both graybox (firmware-based) and blackbox (network-based) analysis
+- **Modular Architecture**: Extensible design supporting multiple emulation and scanning engines
+- **External Verification**: Results can be independently verified using tools like nmap
 
 ## Implementation Graph
 ```mermaid
@@ -11,89 +22,197 @@ graph LR
     Em[Emulation & Systemcall tracking] --> Port[Port Discovery]
 ```
 
-## Running RePort
+## Quick Start Guide
 
-**WARNING**: RePort is a research tool that requires elevated permissions. Potential users who want to run RePort are ***HIGHLY advised*** to do so on isolated virtual machines for their safety.
+> **WARNING**: RePort is a research tool requiring elevated permissions. Run only on isolated virtual machines for security.
 
-To use RePort, clone this repository and create a Python virtual environment to install the dependencies listed in `requirements.txt`
-```
+### Prerequisites
+- Linux environment (tested on Ubuntu 24.04)
+- Python 3.12+
+
+### Installation
+
+```bash
+# Clone the repository
 git clone https://github.com/DPorichis/RePort
 cd RePort
+
+# Set up Python environment
 python -m venv env
-pip install -r ./requirements.txt
-```
-Then run the installation sequence to install all RePort's sub-modules
-```
+source env/bin/activate
+pip install -r requirements.txt
+
+# Install RePort modules and dependencies
 cd ./src
 sudo -E python -m RePort.report -install
 ```
 
-After the installation is compeleted, you can run RePort on your target firmware by running:
-```
+### Basic Usage
+
+**Graybox Analysis** (Firmware-based):
+```bash
 cd ./src
-sudo -E python -m Report.report -gray -firmware [-Path to firmware-]
+sudo -E python -m RePort.report -gray -firmware /path/to/firmware.zip
 ```
 
-## Bibliography
+**Blackbox Analysis** (Network-based):
+```bash
+cd ./src  
+sudo -E python -m RePort.report -black -ip 192.168.1.1
+```
 
-1. **Hui Jun Tay, Kyle Zeng, Jayakrishna Menon Vadayath, Arvind S. Raj, Audrey Dutcher, Tejesh Reddy, Wil Gibbs, Zion Leonahenahe Basque, Fangzhou Dong, Zack Smith, Adam Doupé, Tiffany Bao, Yan Shoshitaishvili, and Ruoyu Wang.** 2023.  
-*Greenhouse: Single-Service Rehosting of Linux-Based Firmware Binaries in User-Space Emulation.*  
-In 32nd USENIX Security Symposium (USENIX Security 23), Anaheim, CA, 5791–5808. USENIX Association.  
-[https://www.usenix.org/conference/usenixsecurity23/presentation/tay](https://www.usenix.org/conference/usenixsecurity23/presentation/tay)
+### Sample Output Structure
+```
+reports/firmware_name-timestamp/
+├── RePort.html             # Interactive HTML report
+├── fs/                     # Extracted filesystem  
+├── systemcall.log          # Raw syscall traces
+├── grype_results.json      # CVE findings
+└── nmap_scan.xml           # Port confirmation results
+```
 
-2. **Mingeun Kim, Dongkwan Kim, Eunsoo Kim, Suryeon Kim, Yeongjin Jang, and Yongdae Kim.** 2020.  
-*FirmAE: Towards Large-Scale Emulation of IoT Firmware for Dynamic Analysis.*  
-In Proceedings of the 36th Annual Computer Security Applications Conference (ACSAC '20).  
-Association for Computing Machinery, New York, NY, USA, 733–745.  
-[https://doi.org/10.1145/3427228.3427294](https://doi.org/10.1145/3427228.3427294)
 
-3. **Daming D. Chen, Manuel Egele, Maverick Woo, and David Brumley.**  
-*Towards Automated Dynamic Analysis for Linux-based Embedded Firmware.*  
-Carnegie Mellon University and Boston University.  
-[https://github.com/firmadyne/firmadyne/blob/master/paper/paper.pdf](https://github.com/firmadyne/firmadyne/blob/master/paper/paper.pdf)
 
-4. **Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Thomas L. Griffiths, Yuan Cao, and Karthik Narasimhan.** 2023.  
-*Tree of Thoughts: Deliberate Problem Solving with Large Language Models.*   
-arXiv.  
-[https://arxiv.org/abs/2305.10601](https://arxiv.org/abs/2305.10601)
+## Evaluation
 
-5. **Amit Sheth, Kaushik Roy, and Manas Gaur.** 2023.  
-*Neurosymbolic AI – Why, What, and How.*  
-arXiv.  
-[https://arxiv.org/abs/2305.00813](https://arxiv.org/abs/2305.00813)
+Our evaluation across 10 firmware images from major vendors (D-Link, Netgear, ASUS, TP-Link, TRENDnet, Belkin) successfully identified:
+- **95+ open ports** across 133 instances
+- **63 critical binaries** with external network access
+- **403 CVE appearances** in vulnerable components
+- **Average analysis time**: ~10 minutes per firmware
 
-6. **Xingchen Wu, Qin Qiu, Jiaqi Li, and Yang Zhao.** 2023.  
-*Intell-dragonfly: A Cybersecurity Attack Surface Generation Engine Based On Artificial Intelligence-generated Content Technology.*  
-arXiv.  
-[https://arxiv.org/abs/2311.00240](https://arxiv.org/abs/2311.00240)
+All evaluation executions were conducted using Github Actions and are stored as artifacts under this repository.
 
-7. **Zicong Gao, Chao Zhang, Hangtian Liu, Wenhou Sun, Zhizhuo Tang, Liehui Jiang, Jianjun Chen, and Yong Xie** 2024.  
-*Faster and Better: Detecting Vulnerabilities in Linux-based IoT Firmware with Optimized Reaching Definition Analysis*  
-Network and Distributed System Security (NDSS) Symposium 2024.  
-[https://www.ndss-symposium.org/wp-content/uploads/2024-346-paper.pdf](https://www.ndss-symposium.org/wp-content/uploads/2024-346-paper.pdf)
+## Technical Innovation
 
-8. **Wil Gibbs, Arvind S. Raj, Jayakrishna Menon Vadayath, Hui Jun Tay, Justin Miller, Akshay Ajayan, Zion Leonahenahe Basque, Audrey Dutcher, Fangzhou Dong, Xavier Maso, Giovanni Vigna, Christopher Kruegel, Adam Doupé, Yan Shoshitaishvili, and Ruoyu Wang.** 2024.
-*Operation Mango: Scalable Discovery of Taint-Style Vulnerabilities in Binary Firmware Services.*  
-In 33rd USENIX Security Symposium (USENIX Security 24), Philadelphia, PA, 7123–7139. USENIX Association.  
-[https://www.usenix.org/conference/usenixsecurity24/presentation/gibbs](https://www.usenix.org/conference/usenixsecurity24/presentation/gibbs)
+### Custom System Call Tracking
+RePort utilizes a custom fork of FirmAE with enhanced system call monitoring capabilities:
+- **Extended syscall coverage**: Tracks `socket()`, `bind()`, `close()`, `fork()`, `exec()` with return codes
+- **IPv6 support**: Full protocol family coverage beyond original FirmAE
+- **Port inheritance tracking**: Handles complex process forking and file descriptor inheritance
+- **Improved accuracy**: Captures actual port assignments for dynamic bindings
 
-10. **Ibrahim Nadir, Haroon Mahmood, and Ghalib Asadullah.** 2022.  
-*A taxonomy of IoT firmware security and principal firmware analysis techniques.*  
-International Journal of Critical Infrastructure Protection, Volume 38, 2022, 100552.  
-[https://www.sciencedirect.com/science/article/pii/S1874548222000373](https://www.sciencedirect.com/science/article/pii/S1874548222000373)
-  
-11. **Yaniv David, Nimrod Partush, and Eran Yahav.** 2018.  
-*FirmUp: Precise Static Detection of Common Vulnerabilities in Firmware.*  
-In Proceedings of the Twenty-Third International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS '18).  
-Association for Computing Machinery, New York, NY, USA, 392–404.  
-[https://dl.acm.org/doi/abs/10.1145/3296957.3177157](https://dl.acm.org/doi/abs/10.1145/3296957.3177157)
+Implementations available for these functionalities under:
+- [George-RG/FirmaInc](https://github.com/George-RG/FirmaInc) - Enhanced FirmAE fork
+- [RePort-FEMU/kernel-v2.6](https://github.com/RePort-FEMU/kernel-v2.6) - Custom v2.6 Kernel
+- [RePort-FEMU/kernel-v4.1](https://github.com/RePort-FEMU/kernel-v4.1) - Custom v4.1 Kernel
 
-12. **X. Feng, X. Zhu, Q. -L. Han, W. Zhou, S. Wen and Y. Xiang.** 2023. 
-*Detecting Vulnerability on IoT Device Firmware: A Survey*  
-In IEEE/CAA Journal of Automatica Sinica, vol. 10, no. 1, pp. 25-41, January 2023  
-[https://ieeexplore.ieee.org/abstract/document/9878283](https://ieeexplore.ieee.org/abstract/document/9878283)
+### Port Activity Analysis
+The core `PortActivity` class provides stateful tracking of:
+- Process-to-port relationships over time
+- Protocol family identification (TCP/UDP, IPv4/IPv6)
+- Binary attribution through exec call correlation  
+- Port lifecycle management (open/close/inherit patterns)
 
-13. **Ang Cui, Michael Costello and Salvatore J. Stolfo.** 2013.  
-*When Firmware Modifications Attack: A Case Study of Embedded Exploitation*  
-Network and Distributed System Security (NDSS) Symposium 2013.  
-[http://ids.cs.columbia.edu/sites/default/files/ndss-2013.pdf](http://ids.cs.columbia.edu/sites/default/files/ndss-2013.pdf)
+
+## Analysis Modes
+
+RePort offers two analysis modes, depending on whether you have access to a firmware copy or only a running system.
+
+### Graybox Analysis
+**Input**: Firmware image (ZIP/binary)
+**Process**: 
+1. Firmware emulation with syscall tracking
+2. Port-to-binary attribution 
+3. CVE database lookup
+4. Optional port confirmation via network scanning
+
+**Output**: Comprehensive attack surface map with:
+- Timeline of port operations
+- Binary "nutrition labels" with metadata
+- CVE findings with severity ratings
+- Confirmed and potential exposures
+
+### Blackbox Analysis  
+**Input**: Target IP address
+**Process**:
+1. Network port scanning
+2. Service fingerprinting
+3. Version detection
+
+**Output**: External view of exposed services
+
+## Command-Line Options
+
+`RePort` provides several command-line flags to control scanning behavior, engine selection, and utility management. Below is a breakdown of all available options.
+
+### Scan Type
+- `-black` : Run a **Blackbox scan**  
+- `-gray`  : Run a **Graybox scan**  
+
+> **Note:** `-black` and `-gray` are mutually exclusive. Only one can be used at a time.
+
+### Input Source
+- `-ip <IP>` : Specify a **target IP address** to scan  
+- `-firmware <PATH>` : Specify the **path to a firmware** file to scan  
+
+> **Note:** These options are mutually exclusive; provide only one input source per scan.
+
+### Utility & Installation
+- `-install` : Installs all dependencies required for RePort and its scanning engines  
+- `-network-fix` : Resets network configurations that may have been left hanging from previous scans  
+
+### Engine Management
+- `-engine <ENGINE>` : Selects which engine to use for scanning  
+- `-engine-mode <MODE>` : Specifies the mode in which the selected engine should run  
+- `-engine-help <ENGINE>` : Prints help information for the specified engine  
+- `-le` : Lists all engines available for the chosen scan type  
+- `-cleanup` : Removes all logs created by the specified engine, resetting its functionality  
+
+### Evaluation
+- `-eval` : Activates **evaluation mode**, generating a simple CSV with benchmarks suitable for GitHub Action collection  
+
+
+## Default Tools in This Release
+- **Emulation Engine**: [FirmInc](https://github.com/George-RG/FirmaInc) (Our custom FirmAE fork)
+- **Network Verification**: [Nmap](https://nmap.org/)
+- **CVE Lookup Engine**: [Grype](https://github.com/anchore/grype) 
+
+## Extensibility
+
+### Adding Custom Emulation Engines
+Implement the `EmulationEngine` interface:
+```python
+class CustomEngine(EmulationEngine):
+    def install(self): pass
+    def name(self): pass       # Print the name of the Engine
+    def check(self): pass      # Extract syscall logs  
+    def analysis(self): pass   # Parse logs with PortActivity
+    def emulate(self): pass    # Start interactive session
+    def terminate(self): pass  # Clean shutdown
+```
+
+### Adding Custom Network Verification Tools
+Implement the `MappingEngine` interface:
+```python
+class CustomScanner(MappingEngine):
+    def install(self): pass
+    def name(self): pass                  # Print the name of the Engine
+    def scan(self, ip, options): pass     # Perform Scan over the given IP
+    def parser(self, scan_result): pass   # Parse the results and convert them to BlackBoxScan instance
+```
+
+## Citation
+
+If you use RePort in your research, please cite:
+
+```bibtex
+@misc{uoadl:5298750,
+    BIBTEX_ENTRY = "misc",
+    year = "2025",
+    school = "School of Science, Department of Informatics and Telecommunications, National and Kapodistrian University of Athens",
+    author = "PORICHIS DIMITRIOS-STEFANOS",
+    title = "RePort: Automatically Mapping the Attack Surface of IoT Systems"
+}
+```
+
+
+## Current Limitations
+- UDP port confirmation not yet implemented
+- CVE detection may have false negatives  
+- Architecture support is limited by the emulation engine capabilities
+- Non-deterministic emulation may require manual intervention
+
+---
+
+For detailed technical documentation, please refer to the [complete thesis document](https://pergamos.lib.uoa.gr/item/uoadl:5298750).
